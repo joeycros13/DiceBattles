@@ -6,7 +6,7 @@ Full documentation of the game's systems, module organization, data structures, 
 
 ## 1. High-Level Overview
 
-```
+```text
 ┌────────────────────────────── Roblox DataModel ──────────────────────────────┐
 │ ReplicatedStorage/Shared   → config, pure logic, remotes, types (client+srv)  │
 │ ServerScriptService/Server → authoritative services (owns all state + saves)  │
@@ -20,7 +20,7 @@ Full documentation of the game's systems, module organization, data structures, 
 
 ## 2. Folder & Module Layout
 
-```
+```text
 src/
   shared/
     Loader.luau            -- requires all ModuleScripts in a folder; small DI helper
@@ -47,7 +47,7 @@ src/
       CurrencyService.luau    -- add/spend coins, gems, materials, keys
       InventoryService.luau   -- gear inventory, equip/unequip, slot levels
       TalentService.luau      -- talent rolls (coin cost, rarity-weighted +1)
-      GlobalLevelService.luau -- global XP/level, stat & starting-dice grants
+      GlobalLevelService.luau -- global XP/level; level-ups grant stats, talent rolls & starting-dice
       CombatService.luau      -- per-player combat state machine
       ChestService.luau       -- key spend, loot rolls (single chest, spin-all)
       ShopService.luau        -- stub for gems/Robux/gamepass/daily (extensible)
@@ -89,7 +89,7 @@ Rules:
 ## 5. Data Structures
 
 ### 5.1 PlayerData (persisted)
-```
+```luau
 PlayerData = {
   version: number,
   global = { level: number, xp: number },
@@ -105,7 +105,7 @@ PlayerData = {
 ```
 
 ### 5.2 CombatState (server, transient, per player)
-```
+```luau
 CombatState = {
   chapterId: number,
   stageIndex: number,
