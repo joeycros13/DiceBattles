@@ -6,7 +6,7 @@ Dependency-ordered, small build steps. Each step has three parts: a **Descriptio
 
 ---
 
-## [ ] Step 1 — Scaffold & conventions
+## [x] Step 1 — Scaffold & conventions
 
 **Description:** Project skeleton, `Loader` (requires all modules in a folder), `Remotes` registry, `Types` aliases, service/UI stubs each with `init`/`start`.
 
@@ -17,7 +17,7 @@ Create the Rojo folder structure and module conventions: Shared/Loader, Shared/R
 
 **Verify:** `rojo build -o build.rbxlx` succeeds; on play, server and client bootstrap logs list all loaded modules with no require errors.
 
-## [ ] Step 2 — Config data (placeholders)
+## [x] Step 2 — Config data (placeholders)
 
 **Description:** Pure data modules defining all game content and tunables.
 
@@ -28,7 +28,7 @@ Fill Shared/Config modules: Rarities, Slots, Gear, Talents, Traits, Enemies, Cha
 
 **Verify:** A scratch script requires each module and prints counts/sample lookups matching expectations (5 rarities, 6 slots, 3 chapters × 5 stages, boss flagged last).
 
-## [ ] Step 3 — Pure combat logic
+## [x] Step 3 — Pure combat logic
 
 **Description:** Deterministic, side-effect-free combat math + `LootTable` helper.
 
@@ -39,7 +39,7 @@ Implement Shared/Logic/DiceHands (best hand + multiplier for 1-5 dice) and Damag
 
 **Verify:** Test script asserts: each hand type detected & multiplied correctly; five-of-a-kind=8x; straight/full house require 5 dice; `(base+flat)*(1+pct)*mult*crit` matches; incoming order DR→shield→HP with overflow.
 
-## [ ] Step 4 — DataService & schema
+## [x] Step 4 — DataService & schema
 
 **Description:** Authoritative persistence layer other services depend on.
 
@@ -50,7 +50,7 @@ Implement DataService: default PlayerData per Types, DataStore load with session
 
 **Verify:** New player gets default profile; a mutation persists across rejoin; session lock prevents double-load; logs confirm autosave.
 
-## [ ] Step 5 — Menu shell + responsive scaling
+## [x] Step 5 — Menu shell + responsive scaling
 
 **Description:** Menu container, tab bar, tab switching, scaling utilities, asset resolver stub.
 
