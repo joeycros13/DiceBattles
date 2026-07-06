@@ -48,23 +48,34 @@ local function orderedNames(modules: { [string]: any }, order: { string }?): { s
 end
 
 -- Call module.init(deps) on each module that defines it, in dependency order.
+-- Each module is isolated in a pcall so one failure does not abort the rest;
+-- the offending module and phase are logged for diagnosis.
 function Loader.initModules(modules: { [string]: any }, deps: any, order: { string }?)
 	for _, name in orderedNames(modules, order) do
 		local module = modules[name]
 		if type(module) == "table" and type(module.init) == "function" then
-			module.init(deps)
-			print(("[Loader] init %s"):format(name))
+			local ok, err = pcall(module.init, deps)
+			if ok then
+				print(("[Loader] init %s"):format(name))
+			else
+				warn(("[Loader] init FAILED for %s: %s"):format(name, tostring(err)))
+			end
 		end
 	end
 end
 
 -- Call module.start() on each module that defines it, in dependency order.
+-- Each module is isolated in a pcall so one failure does not abort the rest.
 function Loader.startModules(modules: { [string]: any }, order: { string }?)
 	for _, name in orderedNames(modules, order) do
 		local module = modules[name]
 		if type(module) == "table" and type(module.start) == "function" then
-			module.start()
-			print(("[Loader] start %s"):format(name))
+			local ok, err = pcall(module.start)
+			if ok then
+				print(("[Loader] start %s"):format(name))
+			else
+				warn(("[Loader] start FAILED for %s: %s"):format(name, tostring(err)))
+			end
 		end
 	end
 end

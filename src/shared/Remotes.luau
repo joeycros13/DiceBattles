@@ -54,7 +54,15 @@ local function getContainer(): Folder
 			container = folder
 		end
 	else
-		container = ReplicatedStorage:WaitForChild(CONTAINER_NAME) :: Folder
+		local found = ReplicatedStorage:WaitForChild(CONTAINER_NAME, WAIT_TIMEOUT)
+		assert(
+			found and found:IsA("Folder"),
+			("Remotes container %q did not replicate within %d seconds; did the server call Remotes.init()?"):format(
+				CONTAINER_NAME,
+				WAIT_TIMEOUT
+			)
+		)
+		container = found :: Folder
 	end
 
 	return container :: Folder
