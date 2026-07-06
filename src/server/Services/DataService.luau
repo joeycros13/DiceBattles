@@ -86,6 +86,100 @@ local function deepCopy<T>(value: T): T
 	return copy
 end
 
+-- Starter gear granted to brand-new players so the Equipment tab is usable
+-- before chests exist (Step 13 introduces the loot source). Each entry becomes
+-- an owned, initially-unequipped instance. Safe to trim once chests land.
+local STARTER_GEAR: { { id: string, rarity: string } } = {
+	{ id = "WoodSword", rarity = "Common" },
+	{ id = "IronSword", rarity = "Uncommon" },
+	{ id = "IronHelm", rarity = "Common" },
+	{ id = "RunicHelm", rarity = "Rare" },
+	{ id = "LeatherBelt", rarity = "Common" },
+	{ id = "LeatherVest", rarity = "Common" },
+	{ id = "LuckyCharm", rarity = "Common" },
+	{ id = "Sandals", rarity = "Common" },
+	{ id = "SwiftBoots", rarity = "Uncommon" },
+
+	-- TEST GEAR (R-E9): plentiful same type+rarity sets so gear merging can be
+	-- exercised end-to-end. Trim alongside STARTER_GEAR once chests land.
+	-- Weapons: enough Common to merge twice, plus Uncommon and Rare sets.
+	{ id = "WoodSword", rarity = "Common" },
+	{ id = "WoodSword", rarity = "Common" },
+	{ id = "WoodSword", rarity = "Common" },
+	{ id = "IronSword", rarity = "Common" },
+	{ id = "IronSword", rarity = "Common" },
+	{ id = "IronSword", rarity = "Uncommon" },
+	{ id = "IronSword", rarity = "Uncommon" },
+	{ id = "FlameBlade", rarity = "Rare" },
+	{ id = "FlameBlade", rarity = "Rare" },
+	{ id = "FlameBlade", rarity = "Rare" },
+	-- Helmets
+	{ id = "IronHelm", rarity = "Common" },
+	{ id = "IronHelm", rarity = "Common" },
+	{ id = "SteelHelm", rarity = "Uncommon" },
+	{ id = "SteelHelm", rarity = "Uncommon" },
+	{ id = "SteelHelm", rarity = "Uncommon" },
+	-- Boots
+	{ id = "Sandals", rarity = "Common" },
+	{ id = "Sandals", rarity = "Common" },
+	{ id = "SwiftBoots", rarity = "Uncommon" },
+	-- Charms
+	{ id = "LuckyCharm", rarity = "Common" },
+	{ id = "LuckyCharm", rarity = "Common" },
+	{ id = "LuckyCharm", rarity = "Uncommon" },
+	-- Chestplates
+	{ id = "LeatherVest", rarity = "Common" },
+	{ id = "LeatherVest", rarity = "Common" },
+	{ id = "PlateArmor", rarity = "Rare" },
+	-- Belts
+	{ id = "LeatherBelt", rarity = "Common" },
+	{ id = "LeatherBelt", rarity = "Common" },
+	{ id = "HealerSash", rarity = "Rare" },
+
+	-- BULK TEST GEAR: extra pieces so the inventory overflows several rows,
+	-- exercising scrolling + one-row-at-a-time growth. Trim with STARTER_GEAR.
+	{ id = "WoodSword", rarity = "Common" },
+	{ id = "WoodSword", rarity = "Common" },
+	{ id = "WoodSword", rarity = "Common" },
+	{ id = "IronSword", rarity = "Uncommon" },
+	{ id = "IronSword", rarity = "Uncommon" },
+	{ id = "IronSword", rarity = "Uncommon" },
+	{ id = "FlameBlade", rarity = "Rare" },
+	{ id = "FlameBlade", rarity = "Rare" },
+	{ id = "DragonFang", rarity = "Epic" },
+	{ id = "IronHelm", rarity = "Common" },
+	{ id = "IronHelm", rarity = "Common" },
+	{ id = "IronHelm", rarity = "Common" },
+	{ id = "SteelHelm", rarity = "Uncommon" },
+	{ id = "SteelHelm", rarity = "Uncommon" },
+	{ id = "RunicHelm", rarity = "Rare" },
+	{ id = "RunicHelm", rarity = "Rare" },
+	{ id = "Sandals", rarity = "Common" },
+	{ id = "Sandals", rarity = "Common" },
+	{ id = "Sandals", rarity = "Common" },
+	{ id = "SwiftBoots", rarity = "Uncommon" },
+	{ id = "SwiftBoots", rarity = "Uncommon" },
+	{ id = "PhantomBoots", rarity = "Epic" },
+	{ id = "LuckyCharm", rarity = "Common" },
+	{ id = "LuckyCharm", rarity = "Common" },
+	{ id = "LuckyCharm", rarity = "Common" },
+	{ id = "LuckyCharm", rarity = "Uncommon" },
+	{ id = "LuckyCharm", rarity = "Uncommon" },
+	{ id = "CritGem", rarity = "Epic" },
+	{ id = "LeatherVest", rarity = "Common" },
+	{ id = "LeatherVest", rarity = "Common" },
+	{ id = "LeatherVest", rarity = "Common" },
+	{ id = "PlateArmor", rarity = "Rare" },
+	{ id = "PlateArmor", rarity = "Rare" },
+	{ id = "Aegis", rarity = "Legendary" },
+	{ id = "LeatherBelt", rarity = "Common" },
+	{ id = "LeatherBelt", rarity = "Common" },
+	{ id = "LeatherBelt", rarity = "Uncommon" },
+	{ id = "HealerSash", rarity = "Rare" },
+	{ id = "HealerSash", rarity = "Rare" },
+	{ id = "HealerSash", rarity = "Rare" },
+}
+
 -- Build a fresh, well-defined default profile for a brand-new player (R-D3).
 -- Derived from config so adding a currency/slot/talent needs no edits here.
 local function makeDefaultData(): PlayerData
@@ -106,12 +200,17 @@ local function makeDefaultData(): PlayerData
 		talents[id] = 0 -- all talents present from the start at level 0 (R-T1)
 	end
 
+	local gear: { [string]: Types.GearInstance } = {}
+	for index, entry in STARTER_GEAR do
+		gear["starter_" .. index] = { id = entry.id, rarity = entry.rarity }
+	end
+
 	return {
 		version = CURRENT_VERSION,
 		global = { level = 1, xp = 0 },
 		currencies = (currencies :: any) :: Types.Currencies,
 		startingDiceUpgrade = 0,
-		gear = {},
+		gear = gear,
 		equipped = equipped,
 		slotLevels = slotLevels,
 		talents = talents,

@@ -61,7 +61,7 @@ Build Util/Responsive, Util/UIFactory, Util/AssetResolver, and UI/MenuShell: a S
 
 **Verify:** Tabs switch on click/tap; layout adapts when emulating phone vs desktop; only one tab visible at a time.
 
-## [ ] Step 6 — Equipment tab
+## [x] Step 6 — Equipment tab
 
 **Description:** Full equipment UI + server-side equip/unequip + slot-level display.
 

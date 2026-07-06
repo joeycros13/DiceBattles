@@ -18,6 +18,8 @@ local Logic = Shared:WaitForChild("Logic")
 local Balance = require(Shared:WaitForChild("Config"):WaitForChild("Balance"))
 local DiceHands = require(Logic:WaitForChild("DiceHands"))
 local DamageFormula = require(Logic:WaitForChild("DamageFormula"))
+local InventoryLayout = require(Logic:WaitForChild("InventoryLayout"))
+local MergeLogic = require(Logic:WaitForChild("MergeLogic"))
 
 local M = Balance.HandMultipliers
 local EPS = 1e-9
@@ -257,6 +259,229 @@ do
 	local r = DamageFormula.resolveIncomingDamage({ incoming = 500, shield = 0, hp = 80 })
 	expectApprox(r.hp, 0, "incoming lethal hp floored at 0")
 	expectApprox(r.hpLost, 80, "incoming lethal hpLost == hp")
+end
+
+-- ==================== InventoryLayout: empty-tile / row growth ====================
+
+-- columnCount + cellSize: 7 columns of ~96px targets (10 pad) fit an 800px row,
+-- and the cell then fills the row exactly.
+expectEqual(InventoryLayout.columnCount(800, 96, 10), 7, "columnCount 800/96/10 => 7")
+expectEqual(InventoryLayout.cellSize(800, 7, 10), 105, "cellSize 800/7/10 => 105")
+expectEqual(InventoryLayout.columnCount(0, 96, 10), 1, "columnCount zero width => 1")
+
+-- Row growth uses columns = 8, minRows = 5 (a 40-tile visible area).
+local COLS = 8
+local MINROWS = 5
+
+-- Empty inventory: still fills the whole visible area.
+do
+	local p = InventoryLayout.plan(0, COLS, MINROWS)
+	expectEqual(p.totalRows, 5, "plan(0) totalRows == minRows")
+	expectEqual(p.emptyCount, 40, "plan(0) empties fill visible area")
+end
+
+-- A few items: no extra rows, empties fill the rest of the visible area.
+do
+	local p = InventoryLayout.plan(9, COLS, MINROWS)
+	expectEqual(p.totalRows, 5, "plan(9) stays at minRows")
+	expectEqual(p.emptyCount, 31, "plan(9) empties = 40 - 9")
+end
+
+-- Exactly filling the visible area: no empties, no extra row yet.
+do
+	local p = InventoryLayout.plan(40, COLS, MINROWS)
+	expectEqual(p.totalRows, 5, "plan(40) exactly fills visible area")
+	expectEqual(p.emptyCount, 0, "plan(40) no empties")
+end
+
+-- Overflow by ONE: grows by exactly one row, and only that row is padded.
+do
+	local p = InventoryLayout.plan(41, COLS, MINROWS)
+	expectEqual(p.totalRows, 6, "plan(41) adds exactly one row")
+	expectEqual(p.emptyCount, 7, "plan(41) only the new row is padded (8-1)")
+end
+
+-- Filling that new row: empties return to zero (no premature extra row).
+do
+	local p = InventoryLayout.plan(48, COLS, MINROWS)
+	expectEqual(p.totalRows, 6, "plan(48) still six rows")
+	expectEqual(p.emptyCount, 0, "plan(48) new row filled, no empties")
+end
+
+-- One more after that: exactly one further row appears, again padded alone.
+do
+	local p = InventoryLayout.plan(49, COLS, MINROWS)
+	expectEqual(p.totalRows, 7, "plan(49) adds one more row")
+	expectEqual(p.emptyCount, 7, "plan(49) only the newest row padded")
+end
+
+-- Guards: bad inputs are coerced, never error.
+do
+	local p = InventoryLayout.plan(5, 0, 0)
+	expectEqual(p.columns, 1, "plan guards columns >= 1")
+	expectEqual(p.totalRows, 5, "plan guards minRows >= 1 (rows == items at 1 col)")
+end
+
+-- ==================== MergeLogic: gear merging ====================
+
+-- Three identical Common weapons upgrade to an Uncommon of the same base id.
+do
+	local r = MergeLogic.evaluate({
+		{ id = "WoodSword", rarity = "Common" },
+		{ id = "WoodSword", rarity = "Common" },
+		{ id = "WoodSword", rarity = "Common" },
+	})
+	expectEqual(r.ok, true, "merge 3x WoodSword Common ok")
+	expectEqual(r.result and r.result.id, "WoodSword", "merge result keeps base id")
+	expectEqual(r.result and r.result.rarity, "Uncommon", "merge result rarity +1")
+	expectEqual(r.slot, "Weapon", "merge result slot Weapon")
+end
+
+-- Same slot but different base ids (same rarity) still merge; result uses first id.
+do
+	local r = MergeLogic.evaluate({
+		{ id = "IronSword", rarity = "Common" },
+		{ id = "FlameBlade", rarity = "Common" },
+		{ id = "WoodSword", rarity = "Common" },
+	})
+	expectEqual(r.ok, true, "merge mixed-id same-slot same-rarity ok")
+	expectEqual(r.result and r.result.id, "IronSword", "merge mixed result uses first id")
+	expectEqual(r.result and r.result.rarity, "Uncommon", "merge mixed result rarity +1")
+end
+
+-- Different slots are rejected.
+do
+	local r = MergeLogic.evaluate({
+		{ id = "WoodSword", rarity = "Common" },
+		{ id = "IronHelm", rarity = "Common" },
+		{ id = "LeatherBelt", rarity = "Common" },
+	})
+	expectEqual(r.ok, false, "merge different slots rejected")
+end
+
+-- Different rarities are rejected.
+do
+	local r = MergeLogic.evaluate({
+		{ id = "WoodSword", rarity = "Common" },
+		{ id = "WoodSword", rarity = "Common" },
+		{ id = "WoodSword", rarity = "Uncommon" },
+	})
+	expectEqual(r.ok, false, "merge different rarities rejected")
+end
+
+-- Legendary cannot be upgraded further.
+do
+	local r = MergeLogic.evaluate({
+		{ id = "Aegis", rarity = "Legendary" },
+		{ id = "Aegis", rarity = "Legendary" },
+		{ id = "Aegis", rarity = "Legendary" },
+	})
+	expectEqual(r.ok, false, "merge Legendary rejected (no higher rarity)")
+end
+
+-- Wrong count is rejected.
+do
+	local r = MergeLogic.evaluate({
+		{ id = "WoodSword", rarity = "Common" },
+		{ id = "WoodSword", rarity = "Common" },
+	})
+	expectEqual(r.ok, false, "merge with 2 inputs rejected")
+end
+
+-- resultFor previews the upgrade for a single selection.
+do
+	local preview = MergeLogic.resultFor({ id = "WoodSword", rarity = "Common" })
+	expectEqual(preview and preview.rarity, "Uncommon", "resultFor Common -> Uncommon")
+	expectEqual(MergeLogic.resultFor({ id = "Aegis", rarity = "Legendary" }), nil, "resultFor Legendary -> nil")
+	expectEqual(MergeLogic.resultFor(nil), nil, "resultFor nil -> nil")
+	expectEqual(MergeLogic.slotOf({ id = "WoodSword", rarity = "Common" }), "Weapon", "slotOf WoodSword -> Weapon")
+end
+
+-- ==================== MergeLogic: auto merge (cascading) ====================
+
+-- Helper: total gear of a given rarity produced by an auto plan.
+local function countRarity(plan: any, rarity: string): number
+	local n = 0
+	for _, inst in plan.addInstances do
+		if inst.rarity == rarity then
+			n += 1
+		end
+	end
+	return n
+end
+
+-- 3 Common weapons -> 1 Uncommon.
+do
+	local plan = MergeLogic.planAuto({
+		{ uid = "a", id = "WoodSword", rarity = "Common" },
+		{ uid = "b", id = "WoodSword", rarity = "Common" },
+		{ uid = "c", id = "WoodSword", rarity = "Common" },
+	})
+	expectEqual(#plan.removeUids, 3, "auto 3 Common: removes 3")
+	expectEqual(#plan.addInstances, 1, "auto 3 Common: adds 1")
+	expectEqual(countRarity(plan, "Uncommon"), 1, "auto 3 Common: result Uncommon")
+end
+
+-- 3 Common + 2 Uncommon cascade: 3 Common -> 1 Uncommon, then 3 Uncommon -> 1 Rare.
+do
+	local plan = MergeLogic.planAuto({
+		{ uid = "a", id = "WoodSword", rarity = "Common" },
+		{ uid = "b", id = "WoodSword", rarity = "Common" },
+		{ uid = "c", id = "WoodSword", rarity = "Common" },
+		{ uid = "d", id = "IronSword", rarity = "Uncommon" },
+		{ uid = "e", id = "IronSword", rarity = "Uncommon" },
+	})
+	expectEqual(#plan.removeUids, 5, "auto cascade: removes all 5 originals")
+	expectEqual(#plan.addInstances, 1, "auto cascade: adds 1")
+	expectEqual(countRarity(plan, "Rare"), 1, "auto cascade: result Rare")
+end
+
+-- Nothing to merge (only 2 of a kind).
+do
+	local plan = MergeLogic.planAuto({
+		{ uid = "a", id = "WoodSword", rarity = "Common" },
+		{ uid = "b", id = "WoodSword", rarity = "Common" },
+	})
+	expectEqual(#plan.removeUids, 0, "auto nothing: removes 0")
+	expectEqual(#plan.addInstances, 0, "auto nothing: adds 0")
+end
+
+-- 9 Common weapons -> 3 Uncommon -> 1 Rare (full cascade, synthetics consumed).
+do
+	local nine: { any } = {}
+	for i = 1, 9 do
+		table.insert(nine, { uid = "w" .. i, id = "WoodSword", rarity = "Common" })
+	end
+	local plan = MergeLogic.planAuto(nine)
+	expectEqual(#plan.removeUids, 9, "auto 9 Common: removes 9")
+	expectEqual(#plan.addInstances, 1, "auto 9 Common: adds 1")
+	expectEqual(countRarity(plan, "Rare"), 1, "auto 9 Common: result Rare")
+end
+
+-- Different slots merge independently in one run.
+do
+	local plan = MergeLogic.planAuto({
+		{ uid = "a", id = "WoodSword", rarity = "Common" },
+		{ uid = "b", id = "WoodSword", rarity = "Common" },
+		{ uid = "c", id = "WoodSword", rarity = "Common" },
+		{ uid = "d", id = "IronHelm", rarity = "Common" },
+		{ uid = "e", id = "IronHelm", rarity = "Common" },
+		{ uid = "f", id = "IronHelm", rarity = "Common" },
+	})
+	expectEqual(#plan.removeUids, 6, "auto multi-slot: removes 6")
+	expectEqual(#plan.addInstances, 2, "auto multi-slot: adds 2")
+	expectEqual(countRarity(plan, "Uncommon"), 2, "auto multi-slot: 2 Uncommon")
+end
+
+-- Legendary cannot merge and is left untouched.
+do
+	local plan = MergeLogic.planAuto({
+		{ uid = "a", id = "Aegis", rarity = "Legendary" },
+		{ uid = "b", id = "Aegis", rarity = "Legendary" },
+		{ uid = "c", id = "Aegis", rarity = "Legendary" },
+	})
+	expectEqual(#plan.removeUids, 0, "auto Legendary: removes 0")
+	expectEqual(#plan.addInstances, 0, "auto Legendary: adds 0")
 end
 
 -- ==================== summary ====================

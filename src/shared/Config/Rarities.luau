@@ -71,4 +71,14 @@ function Rarities.orderOf(id: string): number
 	return def and def.order or 0
 end
 
+-- The next rarity up from `id` (e.g. Common -> Uncommon), or nil if `id` is the
+-- highest rarity or unknown. Used by gear merging (R-E9).
+function Rarities.next(id: string): string?
+	local def = Rarities.Defs[id]
+	if not def then
+		return nil
+	end
+	return Rarities.Order[def.order + 1]
+end
+
 return Rarities

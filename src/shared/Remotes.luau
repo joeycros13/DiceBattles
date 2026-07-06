@@ -22,6 +22,8 @@ local EVENT_NAMES: { string } = {
 	"EquipGear",
 	"UnequipGear",
 	"LevelSlot",
+	"MergeGear",
+	"AutoMergeGear",
 	"RollTalent",
 	"OpenChest",
 	"ChooseTrait",
