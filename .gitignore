@@ -1,6 +1,9 @@
 # Project place file
 /FirstRobloxGame.rbxlx
 
+# Rojo build output
+/build.rbxlx
+
 # Roblox Studio lock files
 /*.rbxlx.lock
 /*.rbxl.lock
