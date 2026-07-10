@@ -76,6 +76,7 @@ local popupStat: TextLabel? = nil
 local popupSlotLevel: TextLabel? = nil
 local popupActionButton: TextButton? = nil
 local popupUpgradeButton: TextButton? = nil
+local popupCostLabel: TextLabel? = nil
 local popupSelectedUid: string? = nil
 local popupAction: (() -> ())? = nil
 local popupUpgradeAction: (() -> ())? = nil
@@ -344,6 +345,7 @@ local function populatePopup(gearUid: string): boolean
 	local isEquipped = data.equipped[slotId] == gearUid
 	local button = popupActionButton :: TextButton
 	local upgrade = popupUpgradeButton :: TextButton
+	local costLabel = popupCostLabel :: TextLabel
 	if isEquipped then
 		button.Text = "Unequip"
 		button.BackgroundColor3 = UIFactory.Theme.Negative
@@ -362,6 +364,7 @@ local function populatePopup(gearUid: string): boolean
 			upgrade.AutoButtonColor = false
 			upgrade.BackgroundColor3 = UIFactory.Theme.PanelAlt
 			popupUpgradeAction = nil
+			costLabel.Visible = false
 		else
 			upgrade.Text = "Upgrade (Free)"
 			upgrade.AutoButtonColor = true
@@ -371,6 +374,13 @@ local function populatePopup(gearUid: string): boolean
 					levelSlotRemote:FireServer(slotId)
 				end
 			end
+
+			-- Balance vs. upgrade cost (coins for now; Slot Materials to be added
+			-- alongside once that economy step lands).
+			local coins = (data.currencies and data.currencies.coins) or 0
+			local upgradeCost = Balance.SlotLevels.baseCost + (slotLevel - 1) * Balance.SlotLevels.costPerLevel
+			costLabel.Text = ("You have %d Coins  /  Upgrade: %d Coins"):format(coins, upgradeCost)
+			costLabel.Visible = true
 		end
 	else
 		button.Text = "Equip"
@@ -384,6 +394,7 @@ local function populatePopup(gearUid: string): boolean
 
 		upgrade.Visible = false
 		popupUpgradeAction = nil
+		costLabel.Visible = false
 	end
 
 	popupSelectedUid = gearUid
@@ -547,6 +558,23 @@ local function buildPopup(parent: Frame)
 		end
 	end)
 
+	-- Balance / upgrade-cost line, shown at the very bottom below the Upgrade
+	-- button when an equipped piece is selected.
+	local cost = UIFactory.textLabel({
+		Name = "UpgradeCost",
+		LayoutOrder = 8,
+		Size = UDim2.new(1, 0, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		TextWrapped = true,
+		TextColor3 = Theme.SubText,
+		TextSize = 14,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		Visible = false,
+		ZIndex = 21,
+	})
+	cost.Parent = card
+	popupCostLabel = cost
+
 	-- Close (X) button, top-right of the card.
 	local close = UIFactory.textButton({
 		Name = "Close",
@@ -602,13 +630,15 @@ local function buildSlotButton(slotId: string): TextButton
 	})
 	glyph.Parent = icon
 
-	-- Slot-level badge (bottom-right). Level is tied to the slot (R-E3).
+	-- Slot-level badge (bottom-middle). Level is tied to the slot (R-E3) and is
+	-- only shown while a gear is equipped in this slot (set in renderSlots).
 	local badge = UIFactory.frame({
 		Name = "LevelBadge",
 		BackgroundColor3 = Theme.Background,
-		AnchorPoint = Vector2.new(1, 1),
-		Position = UDim2.new(1, -3, 1, -3),
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 1, -3),
 		Size = UDim2.fromOffset(34, 16),
+		Visible = false,
 	})
 	badge.Parent = button
 	UIFactory.corner(6).Parent = badge
@@ -626,6 +656,7 @@ local function buildSlotButton(slotId: string): TextButton
 		button = button,
 		icon = icon,
 		glyph = glyph,
+		badge = badge,
 		levelLabel = levelLabel,
 		stroke = stroke,
 	}
@@ -772,6 +803,8 @@ local function renderSlots(data: any)
 
 		local equippedUid = data.equipped[slotId]
 		local inst = equippedUid and data.gear[equippedUid]
+		-- Only surface the slot level when something is actually equipped here.
+		widget.badge.Visible = inst ~= nil
 		if inst then
 			local rarityDef = Rarities.get(inst.rarity)
 			local rarityColor = rarityDef and rarityDef.color or Theme.SubText
