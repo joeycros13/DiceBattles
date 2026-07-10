@@ -20,6 +20,7 @@ local DiceHands = require(Logic:WaitForChild("DiceHands"))
 local DamageFormula = require(Logic:WaitForChild("DamageFormula"))
 local InventoryLayout = require(Logic:WaitForChild("InventoryLayout"))
 local MergeLogic = require(Logic:WaitForChild("MergeLogic"))
+local TalentLogic = require(Logic:WaitForChild("TalentLogic"))
 
 local M = Balance.HandMultipliers
 local EPS = 1e-9
@@ -483,6 +484,92 @@ do
 	expectEqual(#plan.removeUids, 0, "auto Legendary: removes 0")
 	expectEqual(#plan.addInstances, 0, "auto Legendary: adds 0")
 end
+
+-- ==================== TalentLogic: weighted roll ====================
+
+-- A fresh talents map: every talent present at level 0 (matches R-T1 defaults).
+local function freshTalents(): { [string]: number }
+	return {
+		Sharpen = 0,
+		Vitality = 0,
+		Berserk = 0,
+		Precision = 0,
+		LuckyHand = 0,
+		Vampiric = 0,
+		Multiroll = 0,
+	}
+end
+
+-- Pool total weight = sum of every talent's rarity weight (2 Common@100,
+-- 1 Uncommon@50, 2 Rare@20, 2 Legendary@2 = 294).
+do
+	local _, total = TalentLogic.buildPool(freshTalents())
+	expectApprox(total, 294, "talent pool total weight (all level 0)")
+end
+
+-- Deterministic pick: rng at 0 hits the first pool entry (Sharpen), a mid roll
+-- lands on Vitality, and a near-1 roll reaches the last entry (Multiroll).
+expectEqual(TalentLogic.pick(freshTalents(), function() return 0.0 end), "Sharpen", "pick rng=0 -> first (Sharpen)")
+expectEqual(TalentLogic.pick(freshTalents(), function() return 0.5 end), "Vitality", "pick rng=0.5 -> Vitality (147/294)")
+expectEqual(TalentLogic.pick(freshTalents(), function() return 0.999 end), "Multiroll", "pick rng~1 -> last (Multiroll)")
+
+-- Maxed talents are excluded: Multiroll (extraDice) caps at level 4.
+expectEqual(TalentLogic.isMaxed("Multiroll", 4), true, "isMaxed Multiroll at cap")
+expectEqual(TalentLogic.isMaxed("Multiroll", 3), false, "isMaxed Multiroll below cap")
+expectEqual(TalentLogic.isMaxed("Sharpen", 999), false, "isMaxed uncapped talent never maxes")
+do
+	local maxed = freshTalents()
+	maxed.Multiroll = 4
+	local _, total = TalentLogic.buildPool(maxed)
+	expectApprox(total, 292, "pool excludes maxed Multiroll (294 - 2)")
+	-- A near-1 roll now lands on Vampiric (the new last eligible entry).
+	expectEqual(TalentLogic.pick(maxed, function() return 0.999 end), "Vampiric", "pick skips maxed talent")
+end
+
+-- An empty talents map means every talent defaults to level 0 (profiles omit
+-- unrolled talents), so buildPool still uses the full definition list and a pick
+-- returns a valid, non-maxed talent rather than nil.
+do
+	local _, total = TalentLogic.buildPool({})
+	expectApprox(total, 294, "empty talents map still builds the full pool")
+	local picked = TalentLogic.pick({}, function() return 0.5 end)
+	record(picked ~= nil, "pick with empty talents map returns a valid talent",
+		("picked=%s"):format(tostring(picked)))
+end
+
+-- Distribution sanity (R-T2): rarer talents roll LESS often than common ones.
+do
+	local rng = Random.new(1337)
+	local counts: { [string]: number } = {}
+	local samples = 4000
+	for _ = 1, samples do
+		local id = TalentLogic.pick(freshTalents(), function()
+			return rng:NextNumber()
+		end)
+		if id then
+			counts[id] = (counts[id] or 0) + 1
+		end
+	end
+	local common = (counts.Sharpen or 0) + (counts.Vitality or 0)
+	local legendary = (counts.Multiroll or 0) + (counts.LuckyHand or 0)
+	record(common > legendary, "distribution: Common rolled more than Legendary",
+		("common=%d legendary=%d"):format(common, legendary))
+	record((counts.Vitality or 0) > (counts.LuckyHand or 0), "distribution: a Common rolled more than a Legendary",
+		("vitality=%d luckyHand=%d"):format(counts.Vitality or 0, counts.LuckyHand or 0))
+end
+
+-- ==================== TalentLogic: effect values & formatting ====================
+
+expectApprox(TalentLogic.effectValue("Sharpen", 3), 6, "effectValue Sharpen L3 (2*3)")
+expectApprox(TalentLogic.effectValue("Berserk", 2), 0.10, "effectValue Berserk L2 (0.05*2)")
+expectApprox(TalentLogic.effectValue("Sharpen", 0), 0, "effectValue at level 0 is 0")
+
+expectEqual(TalentLogic.formatBonus("Sharpen", 3), "+6 Attack", "formatBonus flat attack")
+expectEqual(TalentLogic.formatBonus("Berserk", 2), "+10% Attack", "formatBonus percent attack")
+expectEqual(TalentLogic.formatBonus("Precision", 1), "+2% Crit Chance", "formatBonus percent crit")
+expectEqual(TalentLogic.formatBonus("Vampiric", 1), "+3% Lifesteal", "formatBonus percent lifesteal")
+expectEqual(TalentLogic.formatBonus("Multiroll", 4), "+4 Dice", "formatBonus flat dice")
+expectEqual(TalentLogic.effectLabel("pctAttack"), "Attack", "effectLabel pctAttack -> Attack")
 
 -- ==================== summary ====================
 

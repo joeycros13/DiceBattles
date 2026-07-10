@@ -187,6 +187,10 @@ local function makeDefaultData(): PlayerData
 	for _, id in Currencies.Order do
 		currencies[id] = 0
 	end
+	-- TEST CURRENCY: seed coins so talent rolls can be exercised end-to-end
+	-- before a real coin source (chapter rewards / chests) lands. Trim once
+	-- those economy sources exist (Steps 12-13).
+	currencies.coins = 500
 
 	local slotLevels: { [string]: number } = {}
 	local equipped: { [string]: string? } = {}

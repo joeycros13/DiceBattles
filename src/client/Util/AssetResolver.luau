@@ -43,6 +43,18 @@ local MAP: { [string]: Visual } = {
 	["currency/keys"] = { image = "", color = Color3.fromRGB(230, 210, 150), label = "K" },
 }
 
+-- Per-talent-effect placeholder tints + short glyphs (keyed by TalentEffect from
+-- Config/Talents). Talent icons resolve as "talent/<effect>" e.g. "talent/hp".
+local TALENT_VISUALS: { [string]: Visual } = {
+	flatAttack = { image = "", color = Color3.fromRGB(224, 108, 92), label = "ATK" },
+	pctAttack = { image = "", color = Color3.fromRGB(232, 140, 96), label = "%AK" },
+	critChance = { image = "", color = Color3.fromRGB(245, 200, 70), label = "CRT" },
+	extraReroll = { image = "", color = Color3.fromRGB(120, 210, 235), label = "RRL" },
+	extraDice = { image = "", color = Color3.fromRGB(140, 108, 235), label = "DIE" },
+	hp = { image = "", color = Color3.fromRGB(80, 200, 120), label = "HP" },
+	lifesteal = { image = "", color = Color3.fromRGB(200, 90, 150), label = "LFS" },
+}
+
 -- Per-slot placeholder tints (keyed by slot id from Config/Slots).
 local SLOT_COLORS: { [string]: Color3 } = {
 	Helmet = Color3.fromRGB(150, 170, 200),
@@ -101,6 +113,9 @@ function AssetResolver.resolve(id: string): Visual
 			color = SLOT_COLORS[name] or FALLBACK.color,
 			label = string.sub(name, 1, 2),
 		}
+	elseif category == "talent" then
+		-- Talent placeholders keyed by effect type (name is the TalentEffect).
+		return TALENT_VISUALS[name] or FALLBACK
 	end
 
 	return FALLBACK

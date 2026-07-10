@@ -72,7 +72,7 @@ Build UI/EquipmentTab: a ViewportFrame character rig with idle animation, 6 slot
 
 **Verify:** Equipping moves gear from grid to slot and updates stats; unequip reverses; popup shows Equip vs Unequip correctly; grid stays rarity-sorted; changes persist.
 
-## [ ] Step 7 — Talents tab
+## [x] Step 7 — Talents tab
 
 **Description:** Talent display + authoritative rarity-weighted roll with coin cost.
 
