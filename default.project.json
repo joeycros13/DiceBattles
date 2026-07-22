@@ -12,6 +12,12 @@
     "ServerScriptService": {
       "Server": {
         "$path": "src/server"
+      },
+      "LogicTests": {
+        "$path": "tests/LogicTests.server.luau"
+      },
+      "CombatSim": {
+        "$path": "tests/CombatSim.server.luau"
       }
     },
 
