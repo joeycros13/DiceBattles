@@ -24,6 +24,7 @@ local UI_ORDER = {
 	"EquipmentTab",
 	"BattleTab",
 	"TalentsTab",
+	"ChestUI",
 	"CombatUI",
 }
 

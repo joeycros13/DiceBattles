@@ -1,6 +1,6 @@
 --!strict
--- MenuShell: the root menu ScreenGui with three bottom tabs (Equipment, Battle,
--- Talents) and tab switching (R-M1). Owns the shared layout chrome and exposes a
+-- MenuShell: the root menu ScreenGui with the bottom tabs (Equipment, Battle,
+-- Talents, Shop) and tab switching (R-M1). Owns the shared layout chrome and exposes a
 -- content container per tab so the individual tab modules (later steps) parent
 -- their views into it. Responsive for phone and desktop (R-M2) via Util/Responsive.
 
@@ -18,7 +18,7 @@ local AssetResolver: any = nil
 local DataController: any = nil
 
 -- Bottom tabs, left-to-right (R-M1).
-local TAB_ORDER = { "Equipment", "Battle", "Talents" }
+local TAB_ORDER = { "Equipment", "Battle", "Talents", "Shop" }
 
 -- Design-pixel heights for the bottom tab bar per form factor (scaled at runtime).
 local TABBAR_HEIGHT_DESKTOP = 66

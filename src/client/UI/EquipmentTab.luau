@@ -357,7 +357,7 @@ local function populatePopup(gearUid: string): boolean
 		end
 
 		-- Upgrade (level up the slot) is only offered for the equipped piece.
-		-- Free for now; stays open so the new level/stat update live (R-E8).
+		-- Spends Slot Materials; stays open so the new level/stat update live (R-E8).
 		upgrade.Visible = true
 		if slotLevel >= Balance.SlotLevels.maxLevel then
 			upgrade.Text = "Max Level"
@@ -366,20 +366,22 @@ local function populatePopup(gearUid: string): boolean
 			popupUpgradeAction = nil
 			costLabel.Visible = false
 		else
-			upgrade.Text = "Upgrade (Free)"
-			upgrade.AutoButtonColor = true
-			upgrade.BackgroundColor3 = UIFactory.Theme.Accent
-			popupUpgradeAction = function()
+			-- Slot leveling spends Slot Materials (R-E8); the server validates
+			-- affordability and toasts on failure.
+			local materials = (data.currencies and data.currencies.materials) or 0
+			local upgradeCost = Balance.SlotLevels.baseCost + (slotLevel - 1) * Balance.SlotLevels.costPerLevel
+			local canAfford = materials >= upgradeCost
+
+			upgrade.Text = ("Upgrade (%d M)"):format(upgradeCost)
+			upgrade.AutoButtonColor = canAfford
+			upgrade.BackgroundColor3 = canAfford and UIFactory.Theme.Accent or UIFactory.Theme.PanelAlt
+			popupUpgradeAction = canAfford and function()
 				if levelSlotRemote then
 					levelSlotRemote:FireServer(slotId)
 				end
-			end
+			end or nil
 
-			-- Balance vs. upgrade cost (coins for now; Slot Materials to be added
-			-- alongside once that economy step lands).
-			local coins = (data.currencies and data.currencies.coins) or 0
-			local upgradeCost = Balance.SlotLevels.baseCost + (slotLevel - 1) * Balance.SlotLevels.costPerLevel
-			costLabel.Text = ("You have %d Coins  /  Upgrade: %d Coins"):format(coins, upgradeCost)
+			costLabel.Text = ("You have %d Materials  /  Upgrade: %d Materials"):format(materials, upgradeCost)
 			costLabel.Visible = true
 		end
 	else

@@ -13,13 +13,17 @@ local Config = Shared:WaitForChild("Config")
 local Logic = Shared:WaitForChild("Logic")
 local Gear = require(Config:WaitForChild("Gear"))
 local Slots = require(Config:WaitForChild("Slots"))
+local Rarities = require(Config:WaitForChild("Rarities"))
 local Balance = require(Config:WaitForChild("Balance"))
 local MergeLogic = require(Logic:WaitForChild("MergeLogic"))
+
+local MATERIAL_CURRENCY = "materials"
 
 local InventoryService = {}
 
 local deps: any = nil
 local DataService: any = nil
+local CurrencyService: any = nil
 local equipRemote: RemoteEvent? = nil
 local unequipRemote: RemoteEvent? = nil
 local levelSlotRemote: RemoteEvent? = nil
@@ -104,8 +108,18 @@ function InventoryService.UnequipGear(player: Player, slotId: string): boolean
 	return true
 end
 
--- Raise a slot's level by one, up to Balance.SlotLevels.maxLevel (R-E8). NOTE:
--- Step 13 will make this spend materials via CurrencyService; for now it is free.
+-- Material cost to raise a slot from its current level to the next (R-E8).
+-- baseCost + (level-1) * costPerLevel, so higher levels cost more.
+function InventoryService.slotUpgradeCost(currentLevel: number): number
+	local level = math.max(1, currentLevel)
+	return Balance.SlotLevels.baseCost + (level - 1) * Balance.SlotLevels.costPerLevel
+end
+
+-- Raise a slot's level by one by spending slot materials, up to
+-- Balance.SlotLevels.maxLevel (R-E8, ARCHITECTURE.md 9). Spending goes through
+-- CurrencyService (the sole balance mutator); the level is written via
+-- DataService.update. Returns true only when materials were actually spent and
+-- the level rose, so the client can gate feedback on the result.
 function InventoryService.LevelSlot(player: Player, slotId: string): boolean
 	if type(slotId) ~= "string" or not Slots.get(slotId) then
 		return false
@@ -122,11 +136,52 @@ function InventoryService.LevelSlot(player: Player, slotId: string): boolean
 		return false
 	end
 
+	local cost = InventoryService.slotUpgradeCost(current)
+	if not CurrencyService.canAfford(player, MATERIAL_CURRENCY, cost) then
+		toast(player, ("Not enough materials (need %d)."):format(cost))
+		return false
+	end
+
+	if not CurrencyService.spend(player, MATERIAL_CURRENCY, cost) then
+		return false
+	end
+
 	DataService.update(player, function(profile)
 		local level = profile.slotLevels[slotId] or 1
 		profile.slotLevels[slotId] = math.min(level + 1, Balance.SlotLevels.maxLevel)
 	end)
+
+	local slotDef = Slots.get(slotId)
+	toast(player, ("%s upgraded to Lv %d."):format(slotDef and slotDef.name or slotId, current + 1))
 	return true
+end
+
+-- Grant one gear instance to a player's inventory (unequipped). Used by loot
+-- sources such as ChestService (ARCHITECTURE.md 9). `rarity` is optional and
+-- defaults to the gear def's canonical rarity when omitted/invalid. Returns the
+-- new gear uid on success, or nil if the gear id is unknown / profile unloaded.
+function InventoryService.GrantGear(player: Player, gearId: string, rarity: string?): string?
+	local gearDef = Gear.get(gearId)
+	if not gearDef then
+		return nil
+	end
+
+	local data = DataService.get(player)
+	if not data then
+		return nil
+	end
+
+	local resolvedRarity = gearDef.rarity
+	if type(rarity) == "string" and Rarities.get(rarity) then
+		resolvedRarity = rarity
+	end
+
+	local newUid: string? = nil
+	DataService.update(player, function(profile)
+		newUid = newGearUid(profile)
+		profile.gear[newUid] = { id = gearId, rarity = resolvedRarity }
+	end)
+	return newUid
 end
 
 -- Merge three owned gear of the same type + rarity into one gear a rarity higher
@@ -236,6 +291,7 @@ end
 function InventoryService.init(injected: any)
 	deps = injected
 	DataService = deps.Services.DataService
+	CurrencyService = deps.Services.CurrencyService
 	equipRemote = deps.Remotes.getEvent("EquipGear")
 	unequipRemote = deps.Remotes.getEvent("UnequipGear")
 	levelSlotRemote = deps.Remotes.getEvent("LevelSlot")

@@ -138,7 +138,7 @@ Implement GlobalLevelService: grant global XP on chapter completion/milestones, 
 
 **Verify:** Completing a chapter grants global XP/level; a starting-dice upgrade makes the next run begin with more pre-unlocked dice (still capped at 5).
 
-## [ ] Step 13 — Economy: chest/shop + slot leveling
+## [x] Step 13 — Economy: chest/shop + slot leveling
 
 **Description:** Currency flows, chest loot, slot leveling.
 

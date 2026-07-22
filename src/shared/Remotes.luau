@@ -32,6 +32,7 @@ local EVENT_NAMES: { string } = {
 	"CombatStateUpdated",
 	"CombatEnded",
 	"TraitOffer",
+	"ChestOpened",
 	"Toast",
 }
 

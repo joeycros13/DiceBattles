@@ -22,6 +22,7 @@ local InventoryLayout = require(Logic:WaitForChild("InventoryLayout"))
 local MergeLogic = require(Logic:WaitForChild("MergeLogic"))
 local TalentLogic = require(Logic:WaitForChild("TalentLogic"))
 local GlobalLevel = require(Logic:WaitForChild("GlobalLevel"))
+local LootTable = require(Logic:WaitForChild("LootTable"))
 
 local M = Balance.HandMultipliers
 local EPS = 1e-9
@@ -636,6 +637,85 @@ do
 	expectApprox(GlobalLevel.progress(1, 0), 0, "progress at 0 xp == 0")
 	expectApprox(GlobalLevel.progress(1, GlobalLevel.xpToNext(1) / 2), 0.5, "progress half == 0.5")
 	expectApprox(GlobalLevel.progress(1, GlobalLevel.xpToNext(1) * 2), 1, "progress clamps to 1")
+end
+
+-- ==================== LootTable: weighted rolls ====================
+
+-- roll returns nil for an empty pool or all-zero weights.
+do
+	expectEqual(LootTable.roll({}), nil, "LootTable empty pool -> nil")
+	expectEqual(LootTable.roll({ { weight = 0 }, { weight = 0 } }), nil, "LootTable zero weights -> nil")
+end
+
+-- roll maps the RNG value to the correct weighted bucket boundaries.
+do
+	-- Pool: A weight 1, B weight 3 (total 4). target = rng*4.
+	local pool = { { id = "A", weight = 1 }, { id = "B", weight = 3 } }
+	local a = LootTable.roll(pool, function()
+		return 0.0
+	end)
+	expectEqual(a and a.id, "A", "LootTable target 0 -> A")
+	local aEdge = LootTable.roll(pool, function()
+		return 0.24 -- 0.96 < 1 -> still A
+	end)
+	expectEqual(aEdge and aEdge.id, "A", "LootTable target <1 -> A")
+	local b = LootTable.roll(pool, function()
+		return 0.25 -- 1.0 -> B bucket starts at 1
+	end)
+	expectEqual(b and b.id, "B", "LootTable target 1 -> B")
+	local bHigh = LootTable.roll(pool, function()
+		return 0.999
+	end)
+	expectEqual(bHigh and bHigh.id, "B", "LootTable target ~4 -> B")
+end
+
+-- roll skips zero-weight entries entirely.
+do
+	local pool = { { id = "Z", weight = 0 }, { id = "Y", weight = 5 } }
+	local picked = LootTable.roll(pool, function()
+		return 0.0
+	end)
+	expectEqual(picked and picked.id, "Y", "LootTable skips zero-weight entry")
+end
+
+-- rollMany returns exactly `count` results (clamped at 0 for non-positive).
+do
+	local pool = { { id = "A", weight = 1 } }
+	expectEqual(#LootTable.rollMany(pool, 5), 5, "rollMany count 5")
+	expectEqual(#LootTable.rollMany(pool, 0), 0, "rollMany count 0")
+	expectEqual(#LootTable.rollMany(pool, -3), 0, "rollMany negative -> 0")
+end
+
+-- randomInt is inclusive on both ends and order-agnostic.
+do
+	expectEqual(LootTable.randomInt(3, 3, function()
+		return 0.5
+	end), 3, "randomInt min==max")
+	expectEqual(LootTable.randomInt(1, 6, function()
+		return 0.0
+	end), 1, "randomInt rng 0 -> min")
+	expectEqual(LootTable.randomInt(1, 6, function()
+		return 0.999
+	end), 6, "randomInt rng ~1 -> max")
+	expectEqual(LootTable.randomInt(6, 1, function()
+		return 0.0
+	end), 1, "randomInt swapped bounds -> min")
+end
+
+-- Statistical bias sanity: heavier weight is picked far more often.
+do
+	local pool = { { id = "rare", weight = 1 }, { id = "common", weight = 99 } }
+	local seed = Random.new(12345)
+	local commonHits = 0
+	for _ = 1, 2000 do
+		local picked = LootTable.roll(pool, function()
+			return seed:NextNumber()
+		end)
+		if picked and picked.id == "common" then
+			commonHits += 1
+		end
+	end
+	record(commonHits > 1800, "LootTable weight bias favors common", ("common hits = %d/2000"):format(commonHits))
 end
 
 -- ==================== summary ====================

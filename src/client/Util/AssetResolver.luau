@@ -34,6 +34,7 @@ local MAP: { [string]: Visual } = {
 	["tab/Equipment"] = { image = "", color = Color3.fromRGB(96, 140, 255), label = "EQ" },
 	["tab/Battle"] = { image = "", color = Color3.fromRGB(228, 108, 92), label = "BT" },
 	["tab/Talents"] = { image = "", color = Color3.fromRGB(140, 108, 235), label = "TL" },
+	["tab/Shop"] = { image = "", color = Color3.fromRGB(80, 200, 120), label = "SH" },
 
 	["rig/idle"] = { image = "", color = Color3.fromRGB(120, 124, 140), label = "RIG" },
 

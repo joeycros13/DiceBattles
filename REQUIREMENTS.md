@@ -21,7 +21,7 @@ Complete functional and design requirements for the first playable build. Number
 
 ## 3. Main Menu
 
-- **R-M1** Three bottom tabs: Equipment, Battle, Talents. Player can freely switch between them.
+- **R-M1** Bottom tabs: Equipment, Battle, Talents, Shop. Player can freely switch between them.
 - **R-M2** Layout adapts to phone and desktop viewports.
 
 ### Equipment Tab
