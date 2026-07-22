@@ -94,7 +94,7 @@ Build UI/BattleTab: show current chapter with a Start Battle button; clicking th
 
 **Verify:** Current chapter matches profile; list scroll shows locked vs beaten correctly; Start Battle triggers combat entry.
 
-## [ ] Step 9 — CombatService state machine
+## [x] Step 9 — CombatService state machine
 
 **Description:** The authoritative combat engine.
 

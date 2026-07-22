@@ -100,4 +100,13 @@ Balance.Economy = {
 	chestKeyCost = 1, -- keys per chest roll (R-Y2)
 }
 
+-- === Rewards (R-C5, R-Y4) granted on chapter completion. Placeholder values;
+-- scaled by chapter id so later chapters pay out more. Global XP is granted
+-- separately via Balance.Global.xpPerChapterComplete. ===
+Balance.Rewards = {
+	chapterBaseCoins = 100, -- coins for completing chapter 1
+	chapterCoinsPerChapter = 50, -- extra coins per chapter beyond the first
+	chapterKeys = 1, -- chest keys per chapter completion
+}
+
 return Balance

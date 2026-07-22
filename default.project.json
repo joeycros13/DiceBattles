@@ -15,6 +15,9 @@
       },
       "LogicTests": {
         "$path": "tests/LogicTests.server.luau"
+      },
+      "CombatSim": {
+        "$path": "tests/CombatSim.server.luau"
       }
     },
 
