@@ -36,6 +36,9 @@ export type PlayerData = {
 	talents: { [string]: number },
 	progress: Progress,
 	stats: { [string]: number },
+	-- Permanent combat-stat bonuses accumulated from global level-ups (R-C22).
+	-- Keys match PlayerStats.Stats field names (e.g. maxHp, flatAttack).
+	globalStatBonus: { [string]: number },
 }
 
 -- Transient per-player combat state (see ARCHITECTURE.md 5.2).

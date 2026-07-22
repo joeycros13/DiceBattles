@@ -221,6 +221,8 @@ local function makeDefaultData(): PlayerData
 		progress = { currentChapter = 1, chaptersCompleted = 0 },
 		-- Seed leaderboard-tracked stats to well-defined starting values (R-L2).
 		stats = { highestChapter = 1, highestPlayerLevel = 1 },
+		-- Permanent combat-stat bonuses from global level-ups (R-C22); empty at start.
+		globalStatBonus = {},
 	}
 end
 

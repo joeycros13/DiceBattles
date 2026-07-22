@@ -29,6 +29,7 @@ local CombatService = {}
 local deps: any = nil
 local DataService: any = nil
 local CurrencyService: any = nil
+local GlobalLevelService: any = nil
 
 -- One live battle per player (transient).
 local battles: { [Player]: CombatEngine.Battle } = {}
@@ -62,21 +63,30 @@ local function sync(player: Player)
 end
 
 -- Grant durable chapter-completion rewards and advance progression (R-C5, R-Y4).
--- Global level-up processing is owned by GlobalLevelService (Step 12); here we
--- only bank the XP and currencies and record progress + leaderboard stat.
+-- Global XP (and its cascading level-ups + grants) is owned by GlobalLevelService;
+-- here we record progress + leaderboard stat, then hand XP to that service and
+-- bank the currency rewards.
 local function grantChapterRewards(player: Player, chapterId: number): { [string]: number }
 	local coins = Balance.Rewards.chapterBaseCoins + (chapterId - 1) * Balance.Rewards.chapterCoinsPerChapter
 	local keys = Balance.Rewards.chapterKeys
-	local globalXp = Balance.Global.xpPerChapterComplete
 	local totalChapters = Chapters.count()
 
+	-- Detect a first-time clear so we can add the one-time milestone XP bonus.
+	local firstClear = false
 	DataService.update(player, function(profile)
+		firstClear = chapterId > profile.progress.chaptersCompleted
 		profile.progress.chaptersCompleted = math.max(profile.progress.chaptersCompleted, chapterId)
 		profile.progress.currentChapter = math.clamp(chapterId + 1, 1, totalChapters)
-		profile.global.xp += globalXp
 		profile.stats = profile.stats or {}
 		profile.stats.highestChapter = math.max(profile.stats.highestChapter or 0, chapterId)
 	end)
+
+	-- Global XP: base completion award plus a first-clear milestone bonus (R-C22).
+	local globalXp = Balance.Global.xpPerChapterComplete
+	if firstClear then
+		globalXp += Balance.Global.xpPerChapterMilestone
+	end
+	GlobalLevelService.addXp(player, globalXp)
 
 	CurrencyService.add(player, COIN_CURRENCY, coins)
 	CurrencyService.add(player, KEY_CURRENCY, keys)
@@ -253,6 +263,7 @@ function CombatService.init(injected: any)
 	deps = injected
 	DataService = deps.Services.DataService
 	CurrencyService = deps.Services.CurrencyService
+	GlobalLevelService = deps.Services.GlobalLevelService
 	combatStateUpdated = deps.Remotes.getEvent("CombatStateUpdated")
 	combatEnded = deps.Remotes.getEvent("CombatEnded")
 	traitOffer = deps.Remotes.getEvent("TraitOffer")

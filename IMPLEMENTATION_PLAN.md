@@ -116,7 +116,7 @@ Build UI/CombatUI + CombatController: render dice with lock toggles and a reroll
 
 **Verify:** A full battle is playable via UI end-to-end; UI matches server state exactly; locks/rerolls/targeting behave per rules.
 
-## [ ] Step 11 — Pick-3 traits at 5 dice
+## [x] Step 11 — Pick-3 traits at 5 dice
 
 **Description:** Battle-only trait draft.
 
@@ -127,7 +127,7 @@ When a run reaches 5 active dice, have CombatService send TraitOffer (3 random t
 
 **Verify:** Offer triggers exactly once at 5 dice; chosen trait's effect applies during the battle and clears at battle end.
 
-## [ ] Step 12 — Global level & rewards
+## [x] Step 12 — Global level & rewards
 
 **Description:** Persistent account progression.
 

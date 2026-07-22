@@ -21,6 +21,7 @@ local DamageFormula = require(Logic:WaitForChild("DamageFormula"))
 local InventoryLayout = require(Logic:WaitForChild("InventoryLayout"))
 local MergeLogic = require(Logic:WaitForChild("MergeLogic"))
 local TalentLogic = require(Logic:WaitForChild("TalentLogic"))
+local GlobalLevel = require(Logic:WaitForChild("GlobalLevel"))
 
 local M = Balance.HandMultipliers
 local EPS = 1e-9
@@ -570,6 +571,72 @@ expectEqual(TalentLogic.formatBonus("Precision", 1), "+2% Crit Chance", "formatB
 expectEqual(TalentLogic.formatBonus("Vampiric", 1), "+3% Lifesteal", "formatBonus percent lifesteal")
 expectEqual(TalentLogic.formatBonus("Multiroll", 4), "+4 Dice", "formatBonus flat dice")
 expectEqual(TalentLogic.effectLabel("pctAttack"), "Attack", "effectLabel pctAttack -> Attack")
+
+-- ==================== GlobalLevel: XP curve & level-ups ====================
+
+-- xpToNext follows baseXp + (level-1)*xpPerLevel, floored at level 1.
+do
+	local g = Balance.Global
+	expectApprox(GlobalLevel.xpToNext(1), g.baseXp, "xpToNext(1) == baseXp")
+	expectApprox(GlobalLevel.xpToNext(2), g.baseXp + g.xpPerLevel, "xpToNext(2) == baseXp + xpPerLevel")
+	expectApprox(GlobalLevel.xpToNext(3), g.baseXp + 2 * g.xpPerLevel, "xpToNext(3)")
+	-- Level below 1 is clamped to 1.
+	expectApprox(GlobalLevel.xpToNext(0), g.baseXp, "xpToNext(0) clamps to level 1")
+end
+
+-- Not enough XP to level: xp banks, level unchanged, 0 gained.
+do
+	local need = GlobalLevel.xpToNext(1)
+	local level, xp, gained = GlobalLevel.applyXp(1, 0, need - 1)
+	expectEqual(level, 1, "applyXp below threshold: level unchanged")
+	expectApprox(xp, need - 1, "applyXp below threshold: xp banked")
+	expectEqual(gained, 0, "applyXp below threshold: 0 gained")
+end
+
+-- Exactly enough XP: one level, leftover 0.
+do
+	local level, xp, gained = GlobalLevel.applyXp(1, 0, GlobalLevel.xpToNext(1))
+	expectEqual(level, 2, "applyXp exact: level 2")
+	expectApprox(xp, 0, "applyXp exact: leftover 0")
+	expectEqual(gained, 1, "applyXp exact: 1 gained")
+end
+
+-- Leftover carries: existing xp + added spills into the next level.
+do
+	local level, xp, gained = GlobalLevel.applyXp(1, 50, GlobalLevel.xpToNext(1))
+	expectEqual(level, 2, "applyXp carry: level 2")
+	expectApprox(xp, 50, "applyXp carry: leftover 50")
+	expectEqual(gained, 1, "applyXp carry: 1 gained")
+end
+
+-- Cascading multi-level: enough XP for two levels at once.
+do
+	local twoLevels = GlobalLevel.xpToNext(1) + GlobalLevel.xpToNext(2)
+	local level, xp, gained = GlobalLevel.applyXp(1, 0, twoLevels)
+	expectEqual(level, 3, "applyXp cascade: level 3")
+	expectApprox(xp, 0, "applyXp cascade: leftover 0")
+	expectEqual(gained, 2, "applyXp cascade: 2 gained")
+end
+
+-- Zero / negative added XP never regresses a profile.
+do
+	local level, xp, gained = GlobalLevel.applyXp(2, 30, 0)
+	expectEqual(level, 2, "applyXp zero add: level unchanged")
+	expectApprox(xp, 30, "applyXp zero add: xp unchanged")
+	expectEqual(gained, 0, "applyXp zero add: 0 gained")
+
+	local nlevel, nxp, ngained = GlobalLevel.applyXp(2, 30, -100)
+	expectEqual(nlevel, 2, "applyXp negative add: level unchanged")
+	expectApprox(nxp, 30, "applyXp negative add: xp clamped (no loss)")
+	expectEqual(ngained, 0, "applyXp negative add: 0 gained")
+end
+
+-- progress reports the fraction toward the next level.
+do
+	expectApprox(GlobalLevel.progress(1, 0), 0, "progress at 0 xp == 0")
+	expectApprox(GlobalLevel.progress(1, GlobalLevel.xpToNext(1) / 2), 0.5, "progress half == 0.5")
+	expectApprox(GlobalLevel.progress(1, GlobalLevel.xpToNext(1) * 2), 1, "progress clamps to 1")
+end
 
 -- ==================== summary ====================
 

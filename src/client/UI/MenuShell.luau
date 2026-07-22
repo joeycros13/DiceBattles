@@ -5,6 +5,9 @@
 -- their views into it. Responsive for phone and desktop (R-M2) via Util/Responsive.
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local GlobalLevel = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Logic"):WaitForChild("GlobalLevel"))
 
 local MenuShell = {}
 
@@ -12,6 +15,7 @@ local deps: any = nil
 local UIFactory: any = nil
 local Responsive: any = nil
 local AssetResolver: any = nil
+local DataController: any = nil
 
 -- Bottom tabs, left-to-right (R-M1).
 local TAB_ORDER = { "Equipment", "Battle", "Talents" }
@@ -20,9 +24,21 @@ local TAB_ORDER = { "Equipment", "Battle", "Talents" }
 local TABBAR_HEIGHT_DESKTOP = 66
 local TABBAR_HEIGHT_PHONE = 104
 
+-- Design-pixel heights for the persistent top header (global level + XP bar).
+local HEADER_HEIGHT_DESKTOP = 52
+local HEADER_HEIGHT_PHONE = 72
+
 local screenGui: ScreenGui? = nil
 local contentArea: Frame? = nil
 local tabBar: Frame? = nil
+
+-- Persistent global-level header widgets (R-C22 feedback).
+local headerBar: Frame? = nil
+local levelBadge: Frame? = nil
+local levelBadgeLabel: TextLabel? = nil
+local xpTrack: Frame? = nil
+local xpFill: Frame? = nil
+local xpLabel: TextLabel? = nil
 
 local contentFrames: { [string]: Frame } = {}
 local tabButtons: { [string]: TextButton } = {}
@@ -35,6 +51,7 @@ function MenuShell.init(injected: any)
 	UIFactory = deps.Util.UIFactory
 	Responsive = deps.Util.Responsive
 	AssetResolver = deps.Util.AssetResolver
+	DataController = deps.Controllers.DataController
 	tabChangedEvent = Instance.new("BindableEvent")
 end
 
@@ -128,6 +145,111 @@ local function buildTabButton(tabId: string, order: number): TextButton
 	return button
 end
 
+-- Scaled pixel height of the top header for the current device class.
+local function headerHeight(): number
+	return Responsive.scaled(Responsive.isCompact() and HEADER_HEIGHT_PHONE or HEADER_HEIGHT_DESKTOP)
+end
+
+-- Scaled metrics shared by the header build + responsive relayout.
+local function headerMetrics(): (number, number, number)
+	local badgeWidth = Responsive.scaled(78)
+	local gap = Responsive.scaled(10)
+	local trackHeight = Responsive.scaled(Responsive.isCompact() and 22 or 20)
+	return badgeWidth, gap, trackHeight
+end
+
+-- Build the persistent top header: a "Lv N" badge and a stretchy XP progress bar
+-- that mirrors the replicated global level/XP (R-C22). Positions are explicit so
+-- the bar stretches with the viewport without a flex layout.
+local function buildHeader(): Frame
+	local Theme = UIFactory.Theme
+	local badgeWidth, gap, trackHeight = headerMetrics()
+
+	local bar = UIFactory.frame({
+		Name = "HeaderBar",
+		BackgroundColor3 = Theme.Panel,
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.fromScale(0.5, 0),
+		Size = UDim2.new(1, 0, 0, headerHeight()),
+	})
+	UIFactory.stroke({ Color = Theme.Stroke }).Parent = bar
+	UIFactory.padding(Responsive.scaled(10)).Parent = bar
+
+	local badge = UIFactory.frame({
+		Name = "LevelBadge",
+		BackgroundColor3 = Theme.Accent,
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.new(0, 0, 0.5, 0),
+		Size = UDim2.new(0, badgeWidth, 1, 0),
+	})
+	UIFactory.corner(Responsive.scaled(8)).Parent = badge
+	local badgeLabel = UIFactory.textLabel({
+		Name = "Level",
+		Size = UDim2.fromScale(1, 1),
+		Text = "Lv 1",
+		TextColor3 = Theme.AccentText,
+		Font = Theme.FontBold,
+		TextSize = Responsive.scaled(18),
+	})
+	badgeLabel.Parent = badge
+	badge.Parent = bar
+
+	local track = UIFactory.frame({
+		Name = "XPTrack",
+		BackgroundColor3 = Theme.PanelAlt,
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.new(0, badgeWidth + gap, 0.5, 0),
+		Size = UDim2.new(1, -(badgeWidth + gap), 0, trackHeight),
+	})
+	UIFactory.corner(math.floor(trackHeight / 2)).Parent = track
+	UIFactory.stroke({ Color = Theme.Stroke }).Parent = track
+
+	local fill = UIFactory.frame({
+		Name = "XPFill",
+		BackgroundColor3 = Theme.Positive,
+		Size = UDim2.new(0, 0, 1, 0),
+		ZIndex = 2,
+	})
+	UIFactory.corner(math.floor(trackHeight / 2)).Parent = fill
+	fill.Parent = track
+
+	local xpText = UIFactory.textLabel({
+		Name = "XPText",
+		Size = UDim2.fromScale(1, 1),
+		Text = "0 / 0 XP",
+		TextColor3 = Theme.Text,
+		Font = Theme.FontBold,
+		TextSize = Responsive.scaled(13),
+		ZIndex = 3,
+	})
+	xpText.Parent = track
+	track.Parent = bar
+
+	headerBar = bar
+	levelBadge = badge
+	levelBadgeLabel = badgeLabel
+	xpTrack = track
+	xpFill = fill
+	xpLabel = xpText
+	return bar
+end
+
+-- Update the header from the latest replicated profile (nil-safe before load).
+local function refreshHeader(data: any)
+	if not (levelBadgeLabel and xpFill and xpLabel) then
+		return
+	end
+	local g = data and data.global
+	local level = (g and g.level) or 1
+	local xp = (g and g.xp) or 0
+	local need = GlobalLevel.xpToNext(level)
+	local frac = GlobalLevel.progress(level, xp)
+
+	;(levelBadgeLabel :: TextLabel).Text = ("Lv %d"):format(level)
+	;(xpFill :: Frame).Size = UDim2.new(math.clamp(frac, 0, 1), 0, 1, 0)
+	;(xpLabel :: TextLabel).Text = ("%d / %d XP"):format(math.floor(xp), math.floor(need))
+end
+
 -- Recompute size-dependent properties for the current viewport/device class.
 local function layout()
 	if not (screenGui and contentArea and tabBar) then
@@ -136,8 +258,21 @@ local function layout()
 	local barHeight = Responsive.scaled(
 		Responsive.isCompact() and TABBAR_HEIGHT_PHONE or TABBAR_HEIGHT_DESKTOP
 	)
+	local headH = headerHeight()
 	tabBar.Size = UDim2.new(1, 0, 0, barHeight)
-	contentArea.Size = UDim2.new(1, 0, 1, -barHeight)
+	-- Content sits between the header (top) and the tab bar (bottom).
+	contentArea.Position = UDim2.new(0, 0, 0, headH)
+	contentArea.Size = UDim2.new(1, 0, 1, -(barHeight + headH))
+
+	if headerBar and levelBadge and xpTrack and levelBadgeLabel and xpLabel then
+		local badgeWidth, gap, trackHeight = headerMetrics()
+		headerBar.Size = UDim2.new(1, 0, 0, headH)
+		levelBadge.Size = UDim2.new(0, badgeWidth, 1, 0)
+		xpTrack.Position = UDim2.new(0, badgeWidth + gap, 0.5, 0)
+		xpTrack.Size = UDim2.new(1, -(badgeWidth + gap), 0, trackHeight)
+		levelBadgeLabel.TextSize = Responsive.scaled(18)
+		xpLabel.TextSize = Responsive.scaled(13)
+	end
 
 	for tabId, button in tabButtons do
 		local icon = button:FindFirstChild("Stack") and (button.Stack :: Frame):FindFirstChild("Icon")
@@ -204,6 +339,10 @@ function MenuShell.start()
 	bar.Parent = root
 	tabBar = bar
 
+	-- Persistent top header with the global level badge + XP bar.
+	local header = buildHeader()
+	header.Parent = root
+
 	UIFactory.stroke({ Color = UIFactory.Theme.Stroke }).Parent = bar
 	local barLayout = UIFactory.listLayout({
 		FillDirection = Enum.FillDirection.Horizontal,
@@ -227,6 +366,13 @@ function MenuShell.start()
 
 	layout()
 	Responsive.onChanged(layout)
+
+	-- Mirror the replicated global level/XP into the header, now and on change.
+	refreshHeader(DataController.get())
+	DataController.onChanged(refreshHeader)
+	task.spawn(function()
+		refreshHeader(DataController.waitForData(10))
+	end)
 
 	-- Default to the first tab.
 	MenuShell.showTab(TAB_ORDER[1])

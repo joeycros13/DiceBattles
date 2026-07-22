@@ -66,8 +66,8 @@ Balance.PerChapter = {
 	xpPerEnemyKill = 10,
 	xpPerBossKill = 40,
 	-- XP needed to reach level L+1 = baseXp + (L-1) * xpPerLevel.
-	baseXp = 20,
-	xpPerLevel = 15,
+	baseXp = 5,
+	xpPerLevel = 0,
 	-- Each per-chapter level-up unlocks one more die (up to Balance.Dice.maxDice).
 	diceUnlockPerLevel = 1,
 }
@@ -75,10 +75,18 @@ Balance.PerChapter = {
 -- === Global (persistent) account leveling (R-C22) ===
 Balance.Global = {
 	xpPerChapterComplete = 100,
+	-- One-time bonus the FIRST time a chapter is cleared (a progression milestone).
+	xpPerChapterMilestone = 150,
 	baseXp = 100,
 	xpPerLevel = 50,
-	-- Rewards granted per global level-up.
-	statPointsPerLevel = 1,
+	-- Permanent stat increases granted per global level-up. Keys match
+	-- PlayerStats.Stats field names and are summed into the profile's
+	-- globalStatBonus, then reflected in combat via PlayerStats.compute.
+	statGainsPerLevel = {
+		maxHp = 5,
+		flatAttack = 1,
+	},
+	-- Free talent rolls granted per global level-up (applied immediately).
 	talentRollsPerLevel = 1,
 	-- Starting-dice upgrade every N global levels (permanent, still capped at 5).
 	startingDiceEveryLevels = 5,

@@ -38,6 +38,7 @@ export type StatSource = {
 	slotLevels: { [string]: number },
 	talents: { [string]: number },
 	startingDiceUpgrade: number?,
+	globalStatBonus: { [string]: number }?,
 }
 
 -- Fresh stats table seeded with the player's base values from Balance.
@@ -120,6 +121,16 @@ function PlayerStats.compute(source: StatSource): Stats
 			local level = source.talents[talentId] or 0
 			if level > 0 then
 				applyTalent(stats, def.effect, TalentLogic.effectValue(talentId, level))
+			end
+		end
+	end
+
+	-- Global level-up bonuses (R-C22): keys map directly onto Stats fields, so a
+	-- new gain category needs only a Balance/config entry and no logic change.
+	if source.globalStatBonus then
+		for statName, value in source.globalStatBonus do
+			if type(value) == "number" and (stats :: any)[statName] ~= nil then
+				(stats :: any)[statName] += value
 			end
 		end
 	end
