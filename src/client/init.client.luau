@@ -17,6 +17,7 @@ local UTIL_ORDER = {
 local CONTROLLER_ORDER = {
 	"DataController",
 	"CombatController",
+	"LeaderboardController",
 }
 
 local UI_ORDER = {
@@ -26,6 +27,7 @@ local UI_ORDER = {
 	"TalentsTab",
 	"ChestUI",
 	"CombatUI",
+	"LeaderboardUI",
 }
 
 print("[Client] bootstrap starting")

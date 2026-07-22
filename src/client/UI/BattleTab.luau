@@ -23,6 +23,7 @@ local UIFactory: any = nil
 local Responsive: any = nil
 local MenuShell: any = nil
 local DataController: any = nil
+local LeaderboardUI: any = nil
 local startBattleRemote: RemoteEvent? = nil
 
 -- Default-view widgets (kept for re-render / re-layout).
@@ -357,6 +358,7 @@ function BattleTab.init(injected: any)
 	Responsive = deps.Util.Responsive
 	MenuShell = deps.UI.MenuShell
 	DataController = deps.Controllers.DataController
+	LeaderboardUI = deps.UI.LeaderboardUI
 	startBattleRemote = deps.Remotes.getEvent("StartBattle")
 end
 
@@ -476,6 +478,9 @@ function BattleTab.start()
 
 	-- Chapter list overlay lives above the default view within this tab.
 	buildListOverlay(root)
+
+	-- Leaderboards button + popup, scoped to the Battle tab (R-L2 display).
+	LeaderboardUI.attach(root)
 
 	-- Re-render on any authoritative profile change (advances to the next chapter
 	-- after one is beaten, per R-B3).

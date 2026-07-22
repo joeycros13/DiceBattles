@@ -30,6 +30,7 @@ local deps: any = nil
 local DataService: any = nil
 local CurrencyService: any = nil
 local GlobalLevelService: any = nil
+local LeaderboardService: any = nil
 
 -- One live battle per player (transient).
 local battles: { [Player]: CombatEngine.Battle } = {}
@@ -80,6 +81,11 @@ local function grantChapterRewards(player: Player, chapterId: number): { [string
 		profile.stats = profile.stats or {}
 		profile.stats.highestChapter = math.max(profile.stats.highestChapter or 0, chapterId)
 	end)
+
+	-- Keep the highestChapter leaderboard in sync (R-L2).
+	if LeaderboardService then
+		LeaderboardService.SubmitForPlayer(player, "highestChapter")
+	end
 
 	-- Global XP: base completion award plus a first-clear milestone bonus (R-C22).
 	local globalXp = Balance.Global.xpPerChapterComplete
@@ -264,6 +270,7 @@ function CombatService.init(injected: any)
 	DataService = deps.Services.DataService
 	CurrencyService = deps.Services.CurrencyService
 	GlobalLevelService = deps.Services.GlobalLevelService
+	LeaderboardService = deps.Services.LeaderboardService
 	combatStateUpdated = deps.Remotes.getEvent("CombatStateUpdated")
 	combatEnded = deps.Remotes.getEvent("CombatEnded")
 	traitOffer = deps.Remotes.getEvent("TraitOffer")

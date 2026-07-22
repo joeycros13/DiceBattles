@@ -149,7 +149,7 @@ Implement ChestService (single chest, 1 key = 1 loot roll, spin-all when keys>1,
 
 **Verify:** Opening consumes keys and grants loot; spin-all consumes all keys; leveling a slot spends materials and increases that slot's buff; balances persist.
 
-## [ ] Step 14 — Leaderboards
+## [x] Step 14 — Leaderboards
 
 **Description:** Extensible leaderboard system + two seeded stats.
 

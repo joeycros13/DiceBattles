@@ -221,8 +221,9 @@ local function makeDefaultData(): PlayerData
 		slotLevels = slotLevels,
 		talents = talents,
 		progress = { currentChapter = 1, chaptersCompleted = 0 },
-		-- Seed leaderboard-tracked stats to well-defined starting values (R-L2).
-		stats = { highestChapter = 1, highestPlayerLevel = 1 },
+		-- highestChapter = highest CLEARED chapter, so a fresh player is 0 (no
+		-- clears) and only appears on the leaderboard after beating chapter 1.
+		stats = { highestChapter = 0, highestPlayerLevel = 1 },
 		-- Permanent combat-stat bonuses from global level-ups (R-C22); empty at start.
 		globalStatBonus = {},
 	}
