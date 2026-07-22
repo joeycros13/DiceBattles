@@ -83,7 +83,7 @@ Build UI/TalentsTab and TalentService: list all talents with level + rarity; a R
 
 **Verify:** Roll deducts coins, increments one talent, persists; rarer talents roll less often over many samples; insufficient coins blocks roll.
 
-## [ ] Step 8 — Battle tab
+## [x] Step 8 — Battle tab
 
 **Description:** Chapter selection UI reflecting progress.
 
