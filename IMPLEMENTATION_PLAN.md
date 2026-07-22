@@ -105,7 +105,7 @@ Implement CombatService: chapter/stage/turn flow, spawn 1-3 enemies (boss on las
 
 **Verify:** A server-only simulation plays a full 5-stage chapter: enemies die, stages advance, dice unlock as per-chapter level rises, HP carries over, boss on stage 5, completion grants rewards, death ends run.
 
-## [ ] Step 10 — Combat UI
+## [x] Step 10 — Combat UI
 
 **Description:** Player-facing combat interface bound to replicated state.
 

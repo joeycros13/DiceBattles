@@ -55,6 +55,19 @@ local TALENT_VISUALS: { [string]: Visual } = {
 	lifesteal = { image = "", color = Color3.fromRGB(200, 90, 150), label = "LFS" },
 }
 
+-- Per-enemy placeholder tints + short glyphs (keyed by the lowercase name that
+-- follows "enemy/" in an EnemyDef.icon, e.g. "enemy/slime"). Bosses use a
+-- distinct warm palette so they read as threats.
+local ENEMY_VISUALS: { [string]: Visual } = {
+	slime = { image = "", color = Color3.fromRGB(120, 200, 120), label = "SL" },
+	goblin = { image = "", color = Color3.fromRGB(150, 175, 90), label = "GB" },
+	archer = { image = "", color = Color3.fromRGB(110, 160, 210), label = "AR" },
+	golem = { image = "", color = Color3.fromRGB(150, 140, 120), label = "GO" },
+	boss_ogre = { image = "", color = Color3.fromRGB(210, 120, 80), label = "OG" },
+	boss_lich = { image = "", color = Color3.fromRGB(160, 100, 200), label = "LI" },
+	boss_dragon = { image = "", color = Color3.fromRGB(220, 90, 70), label = "DR" },
+}
+
 -- Per-slot placeholder tints (keyed by slot id from Config/Slots).
 local SLOT_COLORS: { [string]: Color3 } = {
 	Helmet = Color3.fromRGB(150, 170, 200),
@@ -116,6 +129,9 @@ function AssetResolver.resolve(id: string): Visual
 	elseif category == "talent" then
 		-- Talent placeholders keyed by effect type (name is the TalentEffect).
 		return TALENT_VISUALS[name] or FALLBACK
+	elseif category == "enemy" then
+		-- Enemy placeholders keyed by the archetype's icon suffix.
+		return ENEMY_VISUALS[name] or FALLBACK
 	end
 
 	return FALLBACK
