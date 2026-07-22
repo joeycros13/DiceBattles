@@ -159,11 +159,36 @@ local function buildShopRow(entry: any, order: number): Frame
 	UIFactory.corner(Responsive.scaled(10)).Parent = row
 	UIFactory.padding(Responsive.scaled(12)).Parent = row
 
+	-- Icon chip (resolved through AssetResolver by the entry's logical id).
+	local visual = AssetResolver.resolve(entry.icon or "")
+	local chipSize = Responsive.scaled(40)
+	local chip = UIFactory.frame({
+		Name = "Icon",
+		BackgroundColor3 = visual.color,
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.new(0, 0, 0.5, 0),
+		Size = UDim2.fromOffset(chipSize, chipSize),
+	})
+	UIFactory.corner(Responsive.scaled(8)).Parent = chip
+	local chipLabel = UIFactory.textLabel({
+		Size = UDim2.fromScale(1, 1),
+		Text = visual.label,
+		TextColor3 = Theme.AccentText,
+		Font = Theme.FontBold,
+		TextSize = Responsive.scaled(14),
+	})
+	chipLabel.Parent = chip
+	chip.Parent = row
+
+	-- Text column starts after the chip; buy button reserves the right edge.
+	local textX = chipSize + Responsive.scaled(10)
+	local textW = -(textX + Responsive.scaled(124))
+
 	local name = UIFactory.textLabel({
 		Name = "Name",
 		AnchorPoint = Vector2.new(0, 0),
-		Position = UDim2.fromScale(0, 0),
-		Size = UDim2.new(1, -Responsive.scaled(124), 0, Responsive.scaled(26)),
+		Position = UDim2.new(0, textX, 0, 0),
+		Size = UDim2.new(1, textW, 0, Responsive.scaled(26)),
 		Text = entry.name,
 		TextColor3 = Theme.Text,
 		Font = Theme.FontBold,
@@ -176,8 +201,8 @@ local function buildShopRow(entry: any, order: number): Frame
 	local sub = UIFactory.textLabel({
 		Name = "Sub",
 		AnchorPoint = Vector2.new(0, 1),
-		Position = UDim2.fromScale(0, 1),
-		Size = UDim2.new(1, -Responsive.scaled(124), 0, Responsive.scaled(20)),
+		Position = UDim2.new(0, textX, 1, 0),
+		Size = UDim2.new(1, textW, 0, Responsive.scaled(20)),
 		Text = subtitle,
 		TextColor3 = Theme.SubText,
 		Font = Theme.Font,

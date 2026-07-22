@@ -3,6 +3,19 @@
 -- to a placeholder visual (ARCHITECTURE.md 10, R-X4). v1 returns colors + a short
 -- glyph label; swapping in real assets later means editing only the maps below.
 -- UI code renders whatever `resolve` returns and never hard-codes asset ids.
+--
+-- Logical-id categories (all resolve here; add new ones in one place):
+--   tab/<TabId>          explicit MAP entry
+--   currency/<id>        explicit MAP entry (Config/Currencies icon)
+--   rig/<name>           explicit MAP entry (ViewportFrame body tint)
+--   rarity/<RarityId>    Config/Rarities color
+--   slot/<SlotId>        SLOT_COLORS
+--   gear/<SlotId>        SLOT_COLORS (gear inherits its slot's tint)
+--   talent/<Effect>      EFFECT_VISUALS (Config/Talents icon)
+--   trait/<Effect>       EFFECT_VISUALS (Config/Traits icon)
+--   shop/<ShopKind>      SHOP_VISUALS (Config/Shop icon)
+--   enemy/<name>         ENEMY_VISUALS (Config/Enemies icon)
+--   anim/<name>          ANIMATIONS (see AssetResolver.animationId)
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -44,16 +57,38 @@ local MAP: { [string]: Visual } = {
 	["currency/keys"] = { image = "", color = Color3.fromRGB(230, 210, 150), label = "K" },
 }
 
--- Per-talent-effect placeholder tints + short glyphs (keyed by TalentEffect from
--- Config/Talents). Talent icons resolve as "talent/<effect>" e.g. "talent/hp".
-local TALENT_VISUALS: { [string]: Visual } = {
+-- Per-effect placeholder tints + short glyphs, shared by talents and traits since
+-- both key their icons off the same effect vocabulary (TalentEffect / TraitEffect
+-- in Config/Talents & Config/Traits). Icons resolve as "talent/<effect>" or
+-- "trait/<effect>", e.g. "talent/hp" or "trait/damageReduction".
+local EFFECT_VISUALS: { [string]: Visual } = {
 	flatAttack = { image = "", color = Color3.fromRGB(224, 108, 92), label = "ATK" },
 	pctAttack = { image = "", color = Color3.fromRGB(232, 140, 96), label = "%AK" },
 	critChance = { image = "", color = Color3.fromRGB(245, 200, 70), label = "CRT" },
+	critMultiplier = { image = "", color = Color3.fromRGB(245, 170, 60), label = "CDM" },
 	extraReroll = { image = "", color = Color3.fromRGB(120, 210, 235), label = "RRL" },
 	extraDice = { image = "", color = Color3.fromRGB(140, 108, 235), label = "DIE" },
 	hp = { image = "", color = Color3.fromRGB(80, 200, 120), label = "HP" },
 	lifesteal = { image = "", color = Color3.fromRGB(200, 90, 150), label = "LFS" },
+	damageReduction = { image = "", color = Color3.fromRGB(120, 150, 200), label = "DEF" },
+	healAmount = { image = "", color = Color3.fromRGB(110, 205, 150), label = "HEL" },
+}
+
+-- Per-shop-kind placeholder tints + short glyphs (keyed by ShopKind from
+-- Config/Shop). Shop icons resolve as "shop/<kind>" e.g. "shop/gamepass".
+local SHOP_VISUALS: { [string]: Visual } = {
+	gamepass = { image = "", color = Color3.fromRGB(245, 200, 70), label = "VIP" },
+	product = { image = "", color = Color3.fromRGB(120, 210, 235), label = "R$" },
+	daily = { image = "", color = Color3.fromRGB(80, 200, 120), label = "DAY" },
+}
+
+-- Logical animation ids → concrete Roblox asset ids. Kept here (not hard-coded in
+-- UI) so swapping in a bespoke idle/emote is a one-line change (R-X4 covers
+-- animations). 0 = unset (animationId returns "" and callers skip loading).
+local ANIMATIONS: { [string]: number } = {
+	-- A plain, valid idle clip. The avatar's own idle is a PACKAGE (bundle) that
+	-- LoadAnimation cannot resolve inside a ViewportFrame, so we use this default.
+	idle = 507766388,
 }
 
 -- Per-enemy placeholder tints + short glyphs (keyed by the lowercase name that
@@ -127,15 +162,30 @@ function AssetResolver.resolve(id: string): Visual
 			color = SLOT_COLORS[name] or FALLBACK.color,
 			label = string.sub(name, 1, 2),
 		}
-	elseif category == "talent" then
-		-- Talent placeholders keyed by effect type (name is the TalentEffect).
-		return TALENT_VISUALS[name] or FALLBACK
+	elseif category == "talent" or category == "trait" then
+		-- Talents and traits share the same effect vocabulary (name is the effect).
+		return EFFECT_VISUALS[name] or FALLBACK
+	elseif category == "shop" then
+		-- Shop placeholders keyed by ShopKind (name is "gamepass"/"product"/"daily").
+		return SHOP_VISUALS[name] or FALLBACK
 	elseif category == "enemy" then
 		-- Enemy placeholders keyed by the archetype's icon suffix.
 		return ENEMY_VISUALS[name] or FALLBACK
 	end
 
 	return FALLBACK
+end
+
+-- Resolve a logical animation id (e.g. "anim/idle") to a concrete rbxassetid
+-- string, or "" when unset. Callers load only when non-empty, so swapping the
+-- clip (or clearing it) never touches UI logic.
+function AssetResolver.animationId(id: string): string
+	local category, name = split(id)
+	local assetId = category == "anim" and ANIMATIONS[name] or 0
+	if assetId == 0 then
+		return ""
+	end
+	return "rbxassetid://" .. tostring(assetId)
 end
 
 -- Convenience: apply a resolved visual onto an ImageLabel/ImageButton.

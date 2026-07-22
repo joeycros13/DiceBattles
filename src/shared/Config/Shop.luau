@@ -12,6 +12,7 @@ export type ShopEntry = {
 	name: string,
 	kind: ShopKind,
 	description: string,
+	icon: string, -- logical asset id for AssetResolver (e.g. "shop/gamepass")
 	robux: number?, -- Robux price (gamepasses / products)
 	assetId: number?, -- MarketplaceService gamepass/product id (0 = placeholder)
 	grants: { [string]: number }?, -- currency grants (products / daily)
@@ -37,6 +38,7 @@ Shop.Defs = {
 		name = "VIP",
 		kind = "gamepass",
 		description = "Permanent perks and a daily bonus. (Coming soon)",
+		icon = "shop/gamepass",
 		robux = 199,
 		assetId = 0,
 	},
@@ -45,6 +47,7 @@ Shop.Defs = {
 		name = "2x Coins",
 		kind = "gamepass",
 		description = "Doubles all coin rewards. (Coming soon)",
+		icon = "shop/gamepass",
 		robux = 149,
 		assetId = 0,
 	},
@@ -55,6 +58,7 @@ Shop.Defs = {
 		name = "Handful of Gems",
 		kind = "product",
 		description = "A small pouch of gems. (Coming soon)",
+		icon = "shop/product",
 		robux = 99,
 		assetId = 0,
 		grants = { gems = 100 },
@@ -64,6 +68,7 @@ Shop.Defs = {
 		name = "Chest of Gems",
 		kind = "product",
 		description = "A large chest of gems. (Coming soon)",
+		icon = "shop/product",
 		robux = 799,
 		assetId = 0,
 		grants = { gems = 1000 },
@@ -73,6 +78,7 @@ Shop.Defs = {
 		name = "Key Bundle",
 		kind = "product",
 		description = "10 chest keys. (Coming soon)",
+		icon = "shop/product",
 		robux = 199,
 		assetId = 0,
 		grants = { keys = 10 },
@@ -84,6 +90,7 @@ Shop.Defs = {
 		name = "Daily Coins",
 		kind = "daily",
 		description = "A free coin stipend, once per day. (Coming soon)",
+		icon = "shop/daily",
 		grants = { coins = 250 },
 	},
 	DailyKeys = {
@@ -91,6 +98,7 @@ Shop.Defs = {
 		name = "Daily Key",
 		kind = "daily",
 		description = "A free chest key, once per day. (Coming soon)",
+		icon = "shop/daily",
 		grants = { keys = 1 },
 	},
 } :: { [string]: ShopEntry }

@@ -36,6 +36,27 @@ function ShopService.getByKind(kind: string): { Shop.ShopEntry }
 	return Shop.byKind(kind :: any)
 end
 
+-- Convenience kind accessors (UI/perk seams read these instead of string kinds).
+function ShopService.getGamepasses(): { Shop.ShopEntry }
+	return Shop.byKind("gamepass")
+end
+
+function ShopService.getProducts(): { Shop.ShopEntry }
+	return Shop.byKind("product")
+end
+
+-- STUB: gamepass ownership check. A later step will call
+-- MarketplaceService:UserOwnsGamePassAsync(userId, entry.assetId) with caching so
+-- perks (VIP daily bonus, 2x coins) can gate on it. Returns false until a real
+-- gamepass assetId is wired in (assetId == 0 means "not configured yet").
+function ShopService.ownsGamepass(_player: Player, entryId: string): boolean
+	local entry = Shop.get(entryId)
+	if not entry or entry.kind ~= "gamepass" or (entry.assetId or 0) == 0 then
+		return false
+	end
+	return false
+end
+
 -- STUB: begin a purchase for `entryId`. A later step will branch on the entry's
 -- kind and call MarketplaceService:PromptGamePassPurchase / PromptProductPurchase,
 -- then grant via CurrencyService in ProcessReceipt. For now it just acknowledges.

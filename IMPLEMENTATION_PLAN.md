@@ -160,7 +160,7 @@ Implement LeaderboardService (generic OrderedDataStore by stat name) and submit 
 
 **Verify:** Stats submit and read back ranked; values update as the player progresses.
 
-## [ ] Step 15 — Polish & swap-path pass
+## [x] Step 15 — Polish & swap-path pass
 
 **Description:** Consistent placeholder resolution + future-proofing.
 

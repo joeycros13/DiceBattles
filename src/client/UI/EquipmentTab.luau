@@ -184,15 +184,11 @@ local function buildBlockyRig(vp: ViewportFrame)
 	model.Parent = vp
 end
 
--- Default R15 idle animation clip. We use this rather than the player's equipped
--- HumanoidDescription.IdleAnimation because that id points to an animation
--- PACKAGE (bundle), which is not a directly loadable AnimationClip — the engine
--- only resolves packages when a character spawns normally, so LoadAnimation on it
--- fails ("AnimationClip loaded is not valid"). This default is a plain, valid clip.
-local DEFAULT_IDLE_ANIMATION = 507766388
-
 -- Load and loop the idle animation. Requires the model to sit under a WorldModel
--- so the Animator evaluates inside the ViewportFrame.
+-- so the Animator evaluates inside the ViewportFrame. The clip id resolves through
+-- AssetResolver ("anim/idle") so swapping it is a one-line change there (R-X4); we
+-- use a plain default rather than the avatar's own idle, which is a PACKAGE
+-- (bundle) that LoadAnimation cannot resolve inside a ViewportFrame.
 local function playIdle(model: Model)
 	local humanoid = model:FindFirstChildOfClass("Humanoid")
 	if not humanoid then
@@ -204,8 +200,13 @@ local function playIdle(model: Model)
 		animator.Parent = humanoid
 	end
 
+	local animationId = AssetResolver.animationId("anim/idle")
+	if animationId == "" then
+		return
+	end
+
 	local animation = Instance.new("Animation")
-	animation.AnimationId = "rbxassetid://" .. tostring(DEFAULT_IDLE_ANIMATION)
+	animation.AnimationId = animationId
 
 	local ok, track = pcall(function()
 		return (animator :: Animator):LoadAnimation(animation)
