@@ -74,6 +74,9 @@ Fishing.Fish = {
 	Trout = "Easy",
 	Perch = "Medium",
 	RainbowTrout = "Hard",
+	Glowfish = "Easy",
+	BlindCavefish = "Medium",
+	CrystalEel = "Hard",
 } :: { [string]: string }
 
 Fishing.Spots = {
@@ -101,6 +104,19 @@ Fishing.Spots = {
 			{ id = "Trout", weight = 60 },
 			{ id = "Perch", weight = 30 },
 			{ id = "RainbowTrout", weight = 10 },
+		},
+	},
+	-- World 3's glowing lake in the middle hall (Ground/Lake/Water, 2026-10-24): the user's fish
+	-- (memory tools-per-world), a Crystal Rod or better.
+	CrystalLake = {
+		id = "CrystalLake",
+		name = "The Glowing Lake",
+		world = 3,
+		tier = 3,
+		fish = {
+			{ id = "Glowfish", weight = 60 },
+			{ id = "BlindCavefish", weight = 30 },
+			{ id = "CrystalEel", weight = 10 },
 		},
 	},
 } :: { [string]: Spot }

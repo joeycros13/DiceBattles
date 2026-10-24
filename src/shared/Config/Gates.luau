@@ -32,7 +32,22 @@ Gates.list = {
 		materials = { { id = "OakLog", count = 20 }, { id = "Stone", count = 20 } },
 	},
 	-- behind World 2's boss ruins, centred on them; a copy of the forest gate for now
-	{ id = "World3", world = 3, model = "World3Gate", level = 36, coins = 25000 }, -- level 20 before 2026-10-19
+	{
+		id = "World3",
+		world = 3,
+		model = "World3Gate",
+		-- 2026-10-21 (the user asked about 50-75 / 25-50k): a typical player has 25,000
+		-- coins at about level 50, so this keeps World 2 near its 45 minutes (47.9 with
+		-- world_sim.py); 75 / 50,000 would make it 103. Was 36 (20 before 2026-10-19).
+		level = 50,
+		coins = 25000,
+		materials = { { id = "RedwoodLog", count = 25 }, { id = "AmberSap", count = 3 } }, -- 3 sap: the user, 2026-10-21
+	},
+	-- World 4's gate is a mock until World 4 exists (2026-10-24, the user: continue the gates' pattern and tune
+	-- World 3 to it): level 75 (a gate every 25 levels), 225,000 coins, 20 Crystal Shards and 3 Raw Gems (World 3's
+	-- mined materials; 2026-10-24, the user's pick of the simulated options: 30 + 5 and 250,000 made World 3 58.7 min,
+	-- this 52.9, the middle of its 45-60). World 3's run (world_sim.py, world3.json's gate) aims at it. It stands in World 2 and needs
+	-- World 3 (memory world-map-branches).
 } :: { Gate }
 
 -- How close (studs from the sign board) a player must stand to buy.

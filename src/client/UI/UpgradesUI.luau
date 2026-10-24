@@ -25,6 +25,7 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UiSound = require(script.Parent.Parent:WaitForChild("Util"):WaitForChild("UiSound"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = Shared:WaitForChild("Config")
@@ -225,6 +226,7 @@ local function onBuy()
 	if not ok then
 		warn("[UpgradesUI] BuyUpgrade failed: " .. tostring(result))
 	end
+	UiSound.play(if ok and result == true then "Purchase" else "Refuse")
 	UpgradesUI.refresh()
 end
 

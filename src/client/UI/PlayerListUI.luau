@@ -15,7 +15,13 @@
 --       Heads                 Player / Level / Coins column heads
 --       Rows (ScrollingFrame) clones of Templates/Row
 --       Foot                  the gap under the last row
---   Templates/Row             PlayerName, Level, Coins;
+--   Templates/Row             Hit (an invisible button over the row: opens that player's
+--                             profile card, ProfileUI), PlayerName, Level, Coins, Medal (a hidden dark chip right of
+--                             the name: Icon = the medal, Label "#1 Coins" in the medal's
+--                             colour, its UIStroke the same; shown while the player wears a
+--                             weekly leaderboard medal, and the name box narrows to its
+--                             NarrowWidth attribute so the two never overlap: option B on
+--                             https://claude.ai/artifact/Sjkt4yWCvqYH2dWYRot9Vg, 2026-10-22);
 --                             Fill<Even|Odd|You> / Transparency<...> attributes
 --                             (no border: a gold stroke on the yellow row only
 --                             showed as dark spots at its rounded corners)
@@ -26,12 +32,16 @@
 -- left under it, a share of the screen height).
 --
 -- Level and Coins are the players' own attributes (ExpService, CoinService),
--- which replicate to every client. Coins read through Format.coins (1.1M).
+-- and LeaderMedal / LeaderMedalBoard the medal LeaderboardService gave them, which
+-- replicate to every client. Coins read through Format.coins (1.1M).
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterGui = game:GetService("StarterGui")
 local UserInputService = game:GetService("UserInputService")
+
+local Leaderboards = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"):WaitForChild("Leaderboards"))
 
 local PlayerListUI = {}
 
@@ -171,6 +181,34 @@ local function render()
 		if coins then
 			coins.Text = Format.coins(number(who, "Coins", 0))
 		end
+		-- this week's leaderboard medal: the chip names the board ("#1 Coins")
+		local chip = row:FindFirstChild("Medal") :: Frame?
+		local tier = who:GetAttribute("LeaderMedal")
+		local board = who:GetAttribute("LeaderMedalBoard")
+		local medal = if type(tier) == "string" then Leaderboards.Medals[tier] else nil
+		if chip then
+			chip.Visible = medal ~= nil and type(board) == "string"
+			if medal and type(board) == "string" then
+				local icon = chip:FindFirstChild("Icon") :: ImageLabel?
+				if icon then
+					icon.Image = medal.medal
+				end
+				local text = chip:FindFirstChild("Label") :: TextLabel?
+				if text then
+					text.Text = Leaderboards.Text.medalChip:format(medal.place, Leaderboards.Text.statShort[board] or board)
+					text.TextColor3 = medal.fill
+				end
+				local stroke = chip:FindFirstChildOfClass("UIStroke")
+				if stroke then
+					stroke.Color = medal.fill
+				end
+			end
+		end
+		if name then
+			local wide = ((template :: Frame):FindFirstChild("PlayerName") :: TextLabel).Size
+			local narrow = name:GetAttribute("NarrowWidth")
+			name.Size = if chip and chip.Visible and type(narrow) == "number" then UDim2.new(narrow, 0, wide.Y.Scale, 0) else wide
+		end
 	end
 	-- level, then coins, then name so ties don't swap places
 	table.sort(order, function(a, b)
@@ -214,9 +252,21 @@ local function add(who: Player)
 	row.Visible = true
 	row.Parent = list
 	rows[who] = row
+	-- a click on a row opens that player's profile card (ProfileUI; 2026-10-23)
+	local hit = row:FindFirstChild("Hit")
+	if hit and hit:IsA("GuiButton") then
+		hit.Activated:Connect(function()
+			local profile = deps and deps.UI and deps.UI.ProfileUI
+			if profile and who.Parent then
+				profile.show(who)
+			end
+		end)
+	end
 	watching[who] = {
 		who:GetAttributeChangedSignal("Level"):Connect(queue),
 		who:GetAttributeChangedSignal("Coins"):Connect(queue),
+		who:GetAttributeChangedSignal("LeaderMedal"):Connect(queue),
+		who:GetAttributeChangedSignal("LeaderMedalBoard"):Connect(queue),
 		who:GetPropertyChangedSignal("DisplayName"):Connect(queue),
 	}
 	queue()

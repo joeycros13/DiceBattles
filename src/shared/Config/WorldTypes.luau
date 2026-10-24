@@ -81,6 +81,9 @@ export type WorldDef = {
 	name: string, -- display name, e.g. "The Sunny Meadows"
 	folder: string, -- matching Workspace.Worlds child name, e.g. "W01_SunnyMeadows"
 	profile: string?, -- the Index's world card picture (a close-up of the map)
+	-- The world's lighting while you're in it (AmbienceController): Lighting
+	-- properties, plus tables for its Atmosphere / ColorCorrection / SunRays.
+	lighting: { [string]: any }?,
 	-- This world's own roster. An enemy type belongs to exactly one world.
 	enemies: { [string]: EnemyDef },
 	bosses: { [string]: EnemyDef },

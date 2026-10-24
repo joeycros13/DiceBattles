@@ -83,9 +83,47 @@ local function labels(row: Instance): { TextLabel }
 	return out
 end
 
-function CenterRow.fit(row: GuiObject)
+-- The UIScale the row is drawn at: every UIScale on it and its ancestors (a card's
+-- hover grow, a panel's pop). AbsoluteSize already includes it, and so does the drawn
+-- text, so a text size worked out from AbsoluteSize grew twice as a card grew and
+-- jumped a whole size at a time (the VIP card's "1.25× Coins" on hover, 2026-10-21).
+local function drawnScale(row: Instance): number
+	local s = 1
+	local node: Instance? = row
+	while node and not node:IsA("LayerCollector") do
+		local u = node:FindFirstChildOfClass("UIScale")
+		if u then
+			s *= u.Scale
+		end
+		node = node.Parent
+	end
+	return s
+end
+
+-- True while a panel the row is in pops open or shut (its PopScale away from 1): its
+-- AbsoluteSize then lags the scale by a frame, and a fit flashed the text at nearly
+-- twice its size. The row keeps its last size and refits when the pop settles.
+local function popping(row: Instance): boolean
+	local node: Instance? = row
+	while node and not node:IsA("LayerCollector") do
+		local pop = node:FindFirstChild("PopScale")
+		if pop and pop:IsA("UIScale") and math.abs(pop.Scale - 1) > 0.001 then
+			return true
+		end
+		node = node.Parent
+	end
+	return false
+end
+
+-- `fromGroup`: a refit because another row of its group changed; it doesn't pass its own change
+-- back (two rows refitting each other could bounce forever: "Maximum re-entrancy depth", 2026-10-24).
+function CenterRow.fit(row: GuiObject, fromGroup: boolean?)
 	local scale = row:GetAttribute("TextScale")
-	local size = math.max(1, math.floor(row.AbsoluteSize.Y * (if type(scale) == "number" then scale else 0.62) + 0.5))
+	local uiScale = drawnScale(row)
+	if uiScale < 0.05 or popping(row) then
+		return
+	end
+	local size = math.max(1, math.floor(row.AbsoluteSize.Y / uiScale * (if type(scale) == "number" then scale else 0.62) + 0.5))
 	local function apply(ratio: number)
 		local textSize = math.max(1, math.floor(size * ratio))
 		local luckiest = false
@@ -131,7 +169,7 @@ function CenterRow.fit(row: GuiObject)
 				groupRatios[g][row] = nil
 				for other in groupRatios[g] do
 					if other.Parent then
-						CenterRow.fit(other :: GuiObject)
+						CenterRow.fit(other :: GuiObject, true)
 					end
 				end
 			end
@@ -158,10 +196,12 @@ function CenterRow.fit(row: GuiObject)
 			local before = groupRatios[g][row]
 			if before == nil or math.abs(before - own) > 0.02 then
 				groupRatios[g][row] = own
-				-- the group's size may have changed: refit every row in it
-				for other in groupRatios[g] do
-					if other ~= row and other.Parent then
-						CenterRow.fit(other :: GuiObject)
+				-- the group's size may have changed: refit every row in it (once)
+				if not fromGroup then
+					for other in groupRatios[g] do
+						if other ~= row and other.Parent then
+							CenterRow.fit(other :: GuiObject, true)
+						end
 					end
 				end
 				apply(ratioOf(row))
@@ -201,7 +241,7 @@ local function watch(row: Instance)
 			if g and groupRatios[g] then
 				for other in groupRatios[g] do
 					if other ~= row and other.Parent then
-						CenterRow.fit(other :: GuiObject)
+						CenterRow.fit(other :: GuiObject, true)
 					end
 				end
 			end

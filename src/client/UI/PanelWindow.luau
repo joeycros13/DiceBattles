@@ -15,15 +15,33 @@
 -- panel's "OpenSeconds". Closing shrinks it back to 0 over "CloseSeconds",
 -- and only then turns the panel off. Switching straight to another panel
 -- closes the old one at once, so two windows never overlap. A panel without a
--- PopScale just appears and disappears.
+-- PopScale just appears and disappears. Opening plays Util.UiSound's "PanelOpen",
+-- closing "PanelClose" (switching straight to another panel plays only the open).
+--
+-- While a panel is open nothing else can be clicked (2026-10-22, the user: "the only way
+-- out is walking away (if it is a station), clicking outside of the panel, or clicking
+-- the X"):
+--   * the HUD's buttons hide: WeaponHud's SideButtons, Hotbar and Attack, and the whole
+--     QuestTracker (its Guide button); each comes back as it was when the last panel
+--     closes. The player card and coins stay, so prices and balances can be watched.
+--   * each panel has a hand-built full-screen "Catcher" (an invisible TextButton under the
+--     Window): a click outside the window closes the panel instead of reaching the HUD or
+--     the world. The Window and its pieces are Active, so a click on the panel itself never
+--     falls through to the catcher.
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
+
+local UiSound = require(script.Parent.Parent:WaitForChild("Util"):WaitForChild("UiSound"))
 
 local PanelWindow = {}
 
 local panels: { [string]: ScreenGui } = {}
 local openPanel: string? = nil
+
+-- the HUD pieces hidden while a panel is open: { gui, child } (child nil = the whole gui)
+local HUD_HIDDEN = { { "WeaponHud", "SideButtons" }, { "WeaponHud", "Hotbar" }, { "WeaponHud", "Attack" }, { "QuestTracker" } }
+local hudSaved: { [Instance]: boolean }? = nil -- what each was before the first panel opened
 local popTweens: { [ScreenGui]: Tween } = {}
 
 local function number(gui: Instance, name: string, fallback: number): number
@@ -87,6 +105,40 @@ local function closeNow(gui: ScreenGui, animate: boolean)
 	end)
 end
 
+-- Hide (or bring back) the HUD's buttons. Hiding saves what each piece was, so a piece
+-- something else had hidden (the Attack button off a touch screen, the tracker with no
+-- quest) stays hidden when they come back.
+local function setHudHidden(hidden: boolean)
+	local playerGui = Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
+	if not playerGui then
+		return
+	end
+	if hidden and not hudSaved then
+		local saved: { [Instance]: boolean } = {}
+		for _, path in HUD_HIDDEN do
+			local gui = playerGui:FindFirstChild(path[1])
+			local piece = gui and (if path[2] then gui:FindFirstChild(path[2]) else gui)
+			if piece and piece:IsA("GuiObject") then
+				saved[piece] = piece.Visible
+				piece.Visible = false
+			elseif piece and piece:IsA("ScreenGui") then
+				saved[piece] = piece.Enabled
+				piece.Enabled = false
+			end
+		end
+		hudSaved = saved
+	elseif not hidden and hudSaved then
+		for piece, was in hudSaved do
+			if piece:IsA("GuiObject") then
+				piece.Visible = was
+			elseif piece:IsA("ScreenGui") then
+				piece.Enabled = was
+			end
+		end
+		hudSaved = nil
+	end
+end
+
 function PanelWindow.init(_injected: any) end
 
 local function adopt(gui: Instance)
@@ -99,6 +151,15 @@ local function adopt(gui: Instance)
 	end
 	panels[id] = gui
 	gui.Enabled = false
+	-- a click outside the window closes the panel
+	local catcher = gui:FindFirstChild("Catcher")
+	if catcher and catcher:IsA("GuiButton") then
+		catcher.Activated:Connect(function()
+			if openPanel == id then
+				PanelWindow.hidePanel()
+			end
+		end)
+	end
 	for _, descendant in gui:GetDescendants() do
 		if descendant.Name == "Close" and descendant:IsA("GuiButton") then
 			descendant.Activated:Connect(function()
@@ -159,7 +220,11 @@ function PanelWindow.showPanel(panelId: string)
 			closeNow(other, false)
 		end
 	end
+	if openPanel ~= panelId then
+		UiSound.play("PanelOpen")
+	end
 	openPanel = panelId
+	setHudHidden(true)
 	openNow(gui)
 end
 
@@ -167,8 +232,10 @@ function PanelWindow.hidePanel()
 	local id = openPanel
 	openPanel = nil
 	if id and panels[id] then
+		UiSound.play("PanelClose")
 		closeNow(panels[id], true)
 	end
+	setHudHidden(false)
 end
 
 -- True when `panelId` (or any panel, if omitted) is showing.

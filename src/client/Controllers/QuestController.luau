@@ -42,6 +42,7 @@ local MapLayout = require(Config:WaitForChild("MapLayout"))
 local Quests = require(Config:WaitForChild("Quests"))
 local Talkers = require(Config:WaitForChild("Talkers"))
 local Animation = require(Shared:WaitForChild("Animation"))
+local UiSound = require(script.Parent.Parent:WaitForChild("Util"):WaitForChild("UiSound"))
 
 local QuestController = {}
 
@@ -232,8 +233,8 @@ local function converse(line: Quests.Line)
 				accept = "Accept Quest",
 				later = "Not now",
 			})
-			if choice == "accept" then
-				send(line, "accept")
+			if choice == "accept" and send(line, "accept") then
+				UiSound.play("QuestAccept")
 			end
 			return
 		elseif step and state == "Active" then
@@ -244,6 +245,7 @@ local function converse(line: Quests.Line)
 			if choice ~= "accept" or not send(line, "turnIn") then
 				return
 			end
+			UiSound.play("QuestComplete")
 			-- handed in: carry straight on to the next step's offer
 		else
 			DialogueUI.say({ lines = line.finished, tag = "Questline Complete", later = "Goodbye" })

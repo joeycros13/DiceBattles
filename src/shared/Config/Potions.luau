@@ -145,37 +145,40 @@ local RECIPES: { [string]: { recipe: { Ingredient }, coins: number } } = {
 	Swiftness1 = { recipe = { { id = "Horsehair", count = 2 }, { id = "Minnow", count = 2 }, { id = "OakLog", count = 2 } }, coins = 40 },
 	-- World 2's, for testing (2026-10-20): only World 2's fish, gathered wood and enemy drops
 	-- Amber Sap (the redwoods' rare drop) goes in the healing one (the user, 2026-10-20: use it in a World 2 recipe)
-	Regen1 = { recipe = { { id = "Trout", count = 2 }, { id = "FoxFur", count = 3 }, { id = "AmberSap", count = 1 } }, coins = 60 },
-	Gatherer1 = { recipe = { { id = "Perch", count = 2 }, { id = "BoarTusk", count = 2 }, { id = "RedwoodLog", count = 4 } }, coins = 75 },
-	Angler1 = { recipe = { { id = "RainbowTrout", count = 1 }, { id = "Perch", count = 2 }, { id = "BearClaw", count = 1 } }, coins = 90 },
-	Health2 = { recipe = { { id = "Health1", count = 1 }, { id = "BatWing", count = 3 } }, coins = 150 },
-	Strength2 = { recipe = { { id = "Strength1", count = 1 }, { id = "GolemCrystal", count = 2 }, { id = "GolemPebble", count = 2 } }, coins = 250 },
-	Stoneskin2 = { recipe = { { id = "Stoneskin1", count = 1 }, { id = "GolemPebble", count = 4 } }, coins = 250 },
-	Swiftness2 = { recipe = { { id = "Swiftness1", count = 1 }, { id = "BatWing", count = 3 }, { id = "GolemCrystal", count = 1 } }, coins = 200 },
+	Regen1 = { recipe = { { id = "Trout", count = 2 }, { id = "FoxFur", count = 3 }, { id = "AmberSap", count = 1 } }, coins = 400 },
+	Gatherer1 = { recipe = { { id = "Perch", count = 2 }, { id = "BoarTusk", count = 2 }, { id = "RedwoodLog", count = 4 } }, coins = 450 },
+	Angler1 = { recipe = { { id = "RainbowTrout", count = 1 }, { id = "Perch", count = 2 }, { id = "BearClaw", count = 1 } }, coins = 500 },
+	-- World 3's Tier II (2026-10-24, the user: Health, Strength and Stoneskin II are World 3's; Swiftness II
+	-- belongs to World 4): the Tier I potion, the glowing lake's fish, the mined ore or shards, an enemy drop
+	Health2 = { recipe = { { id = "Health1", count = 1 }, { id = "Glowfish", count = 2 }, { id = "BatWing", count = 3 } }, coins = 4000 },
+	Strength2 = { recipe = { { id = "Strength1", count = 1 }, { id = "CrystalEel", count = 1 }, { id = "IronOre", count = 4 }, { id = "GolemCrystal", count = 2 } }, coins = 5000 },
+	Stoneskin2 = { recipe = { { id = "Stoneskin1", count = 1 }, { id = "BlindCavefish", count = 2 }, { id = "CrystalShard", count = 4 }, { id = "GolemPebble", count = 2 } }, coins = 5000 },
+	Swiftness2 = { recipe = { { id = "Swiftness1", count = 1 }, { id = "BatWing", count = 3 }, { id = "GolemCrystal", count = 1 } }, coins = 4500 },
 }
 
--- What one potion sells for from the Inventory (placeholders, 2026-10-20).
+-- What one potion sells for from the Inventory (placeholders, 2026-10-20; World 2's Tier I brews and
+-- sells x10 World 1's since 2026-10-24; Tier II, first brewed in World 3, x10 World 2's Tier I).
 local SELL: { [string]: number } = {
 	Health1 = 18,
 	Strength1 = 32,
 	Stoneskin1 = 29,
 	Swiftness1 = 24,
-	Health2 = 110,
-	Strength2 = 175,
-	Stoneskin2 = 160,
-	Swiftness2 = 140,
+	Health2 = 2500,
+	Strength2 = 3200,
+	Stoneskin2 = 3000,
+	Swiftness2 = 2800,
 	Health3 = 420,
 	Strength3 = 560,
 	Stoneskin3 = 515,
 	Swiftness3 = 470,
-	Regen1 = 40,
-	Regen2 = 220,
+	Regen1 = 250,
+	Regen2 = 2800,
 	Regen3 = 700,
-	Gatherer1 = 45,
-	Gatherer2 = 250,
+	Gatherer1 = 280,
+	Gatherer2 = 3000,
 	Gatherer3 = 790,
-	Angler1 = 55,
-	Angler2 = 300,
+	Angler1 = 320,
+	Angler2 = 3200,
 	Angler3 = 950,
 }
 

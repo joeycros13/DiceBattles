@@ -27,6 +27,7 @@ local EVENT_NAMES: { string } = {
 	"GatherHit", -- (nodeIds: { string }): a tool swing reached these gathering nodes (GatherService)
 	"HoldTool", -- (kind: string?): take out the best tool of that kind, or put it away (MeleeService, Config/Tools)
 	"FishAction", -- { action = "cast", at = Vector3 } | { action = "hook" | "reel" } | { action = "ring", n = number, ok = boolean }: fishing (FishingService)
+	"SetSetting", -- (id: string, value: number | boolean): change one of the player's settings (SettingsService, Config/Settings)
 
 	-- Replication (server -> client)
 	"IndexDiscovered", -- { kind = "Enemy" | "Weapon", id = string }: show the NEW popup
@@ -39,6 +40,7 @@ local EVENT_NAMES: { string } = {
 	"FishState", -- { state = "Cast" | "Approach" | "Bite" | "Surface" | "Ring" | "Caught" | "Escaped" | "Reeled", ... }: this player's fishing (FishingService)
 	"LeaderboardReward", -- { text, rank }: a leaderboard reward was granted (LeaderboardService), shown in chat
 	"HealZone", -- { kind = "healed", amount } | { kind = "cooldown", seconds }: the healing fountain (HealZoneService)
+	"PlayerHurt", -- { character = Model, from = Vector3 }: an enemy's hit landed on a player (MeleeService): every client flashes and flinches that body, the hit player stumbles back (HurtController)
 }
 
 -- RemoteFunctions (request/response).

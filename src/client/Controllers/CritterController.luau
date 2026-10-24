@@ -16,7 +16,11 @@
 --             only onto ground within one step of where it is, never into the creek, never
 --             through a trunk or a building, never into a deer.
 --   Owl       slow head swivels (well past its shoulders), a curious tilt, blinks, and a
---             wing ruffle now and then.
+--             wing ruffle now and then. While the camera is close it hoots now and then
+--             (2026-10-21, the user's request): the hand-placed `Hoot` Sound inside the owl
+--             (positional, so it carries from the roof) plays every CallMin..CallMax seconds
+--             (its attributes) while the camera is within its RollOffMaxDistance, with a
+--             little puff of the body.
 --
 -- One Scheduler system (Render, priority 12: after the enemies' wander at 10, before the
 -- animators at 50). Animals farther than BRAIN_RANGE from the camera just wait; the
@@ -70,6 +74,8 @@ type Entry = {
 	blinkLeft: number,
 	ruffle: number,
 	tilt: number,
+	hoot: number,
+	hootSound: Sound?,
 	eyelids: { BasePart },
 	groundParams: RaycastParams?,
 	blockParams: RaycastParams?,
@@ -312,6 +318,25 @@ local function owl(e: Entry, dt: number)
 			lid.Transparency = 0
 		end
 	end
+	-- a hoot while you're near
+	local sound = e.hootSound
+	if sound then
+		e.hoot -= dt
+		if e.hoot <= 0 then
+			local low, high = sound:GetAttribute("CallMin"), sound:GetAttribute("CallMax")
+			e.hoot = rng:NextNumber(if type(low) == "number" then low else 8, if type(high) == "number" then high else 16)
+			local camera = Workspace.CurrentCamera
+			if camera and (camera.CFrame.Position - e.feet).Magnitude < sound.RollOffMaxDistance then
+				sound:Play()
+				setTargets(e, { lift = 0.06 }, { lift = 12 })
+				task.delay(0.4, function()
+					if e.state then
+						setTargets(e, { lift = 0 }, { lift = 6 })
+					end
+				end)
+			end
+		end
+	end
 	-- a wing ruffle
 	e.ruffle -= dt
 	if e.ruffle <= 0 then
@@ -385,6 +410,8 @@ local function adopt(inst: Instance)
 		blinkLeft = 0,
 		ruffle = rng:NextNumber(5, 12),
 		tilt = rng:NextNumber(2, 6),
+		hoot = rng:NextNumber(2, 6),
+		hootSound = inst:FindFirstChild("Hoot", true) :: Sound?,
 		eyelids = eyelids,
 		groundParams = nil,
 		blockParams = nil,

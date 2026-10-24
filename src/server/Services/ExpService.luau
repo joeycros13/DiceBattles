@@ -14,8 +14,8 @@
 -- Remotes.ExpDropped first, so it can hold the EXP bar while
 -- Balance.Exp.piecesMin..piecesMax blue stars fling out and fly to it.
 --
--- Max health follows the level (Leveling.maxHealth: 100, +10 per level up;
--- user, 2026-10-11 and 2026-10-19). A new character starts full; a level up heals to the new
+-- Max health follows the level (Leveling.maxHealth: 100 at level 1, x10 every 25 levels since
+-- 2026-10-24; it was +10 a level). A new character starts full; a level up heals to the new
 -- max at once (user, 2026-10-19: early HP is scarce and regen is slow). An admin can override the max for the
 -- session (player attribute MaxHealthOverride, AdminService). Worn armour adds
 -- its bonus HP on top of the level's (player attribute ArmorHealth, ArmorService;
@@ -30,6 +30,7 @@ local Balance = require(Config:WaitForChild("Balance"))
 local Enemies = require(Config:WaitForChild("Enemies"))
 local Leveling = require(Config:WaitForChild("Leveling"))
 local Upgrades = require(Config:WaitForChild("Upgrades"))
+local Bonuses = require(Config:WaitForChild("Bonuses"))
 
 local ExpService = {}
 
@@ -85,7 +86,7 @@ function ExpService.maxHealth(player: Player): number
 	local armor = player:GetAttribute("ArmorHealth")
 	local bonus = if type(armor) == "number" and armor > 0 then armor else 0
 	-- the Health upgrade multiplies the lot (Config/Upgrades)
-	return math.floor((Leveling.maxHealth((Leveling.fromTotal(ExpService.get(player)))) + bonus) * Upgrades.value(player, "Health") + 0.5)
+	return math.floor((Leveling.maxHealth((Leveling.fromTotal(ExpService.get(player)))) + bonus) * Bonuses.health(player) + 0.5)
 end
 
 -- Bring the character's max health in line. Health rises by any gain (so a
@@ -143,8 +144,8 @@ local function onKill(enemy: any, killer: Player?)
 	if not amount or amount <= 0 then
 		return
 	end
-	local boost = killer:GetAttribute("ExpBoost")
-	boost = (if type(boost) == "number" and boost > 0 then boost else 1) * Upgrades.value(killer, "Exp")
+	-- passes and boosts (ExpBoost) plus the EXP upgrade, added (Config/Bonuses)
+	local boost = Bonuses.exp(killer)
 	if boost ~= 1 then
 		amount = math.max(1, math.floor(amount * boost + 0.5))
 	end

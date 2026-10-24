@@ -22,9 +22,14 @@
 -- Roblox applies only ONE UIScale per object, so a button must not carry another one
 -- (the old "PressScale"s were removed on 2026-10-20: while both were there, the X buttons
 -- and stall tabs showed no hover or press at all).
+-- Sounds (2026-10-22, Util.UiSound): hovering a clickable button plays "Hover", pressing it
+-- "Click", and pressing a locked one (Active off, or Disabled) "Refuse". "FxNoSound" on a
+-- button turns its sounds off.
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
+
+local UiSound = require(script.Parent:WaitForChild("UiSound"))
 
 local ButtonFx = {}
 
@@ -73,10 +78,18 @@ local function wire(button: GuiButton)
 		local grow = selected or (hovered and clickable(button) and button:GetAttribute("FxNoHover") ~= true)
 		to(if grow then setting(button, if selected then "FxSelected" else "FxHover", setting(button, "FxHover", HOVER)) else 1, info)
 	end
+	local function sound(name: string)
+		if button:GetAttribute("FxNoSound") ~= true then
+			UiSound.play(name)
+		end
+	end
 	button.MouseEnter:Connect(function()
 		hovered = true
 		if not pressed then
 			rest(GROW)
+		end
+		if clickable(button) and button:GetAttribute("Selected") ~= true then
+			sound("Hover")
 		end
 	end)
 	button.MouseLeave:Connect(function()
@@ -84,9 +97,14 @@ local function wire(button: GuiButton)
 		rest(GROW)
 	end)
 	button.MouseButton1Down:Connect(function()
-		if clickable(button) and button:GetAttribute("FxNoPress") ~= true then
+		if not clickable(button) then
+			sound("Refuse")
+		elseif button:GetAttribute("FxNoPress") ~= true then
 			pressed = true
 			to(setting(button, "FxPress", PRESS), SQUASH)
+		end
+		if clickable(button) then
+			sound("Click")
 		end
 	end)
 	button.MouseButton1Up:Connect(function()
@@ -97,6 +115,8 @@ local function wire(button: GuiButton)
 	end)
 	-- a touch has no hover: squash on the tap, then spring back
 	button.TouchTap:Connect(function()
+		-- a tap also fires MouseButton1Down on most devices; MinGap keeps it to one sound
+		sound(if clickable(button) then "Click" else "Refuse")
 		if clickable(button) and button:GetAttribute("FxNoPress") ~= true and not pressed then
 			to(setting(button, "FxPress", PRESS), SQUASH)
 			task.delay(0.07, function()

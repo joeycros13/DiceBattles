@@ -19,12 +19,26 @@
 --   recipe    the materials it takes, in display order (Config/Materials ids);
 --             all of them are used up
 --   defense   0..1: the fraction taken off every enemy hit while it's worn
---   health    extra max HP while it's worn, on top of the level's. Since 2026-10-19 (the
---             quicker level curve) a set adds about a quarter of a player's HP at its
---             level for the first World 1 set, rising to about half by World 3, so
+--   health    extra max HP while it's worn, on top of the level's: about a quarter to a
+--             third of a player's HP at the set's level (see World scale below), so
 --             armour stays worth wearing
+--   regen     (optional) extra share of max HP healed a second while it's worn, on top of
+--             Roblox's 1% and the Regen upgrade / potion (UpgradeService's regen tick)
+--   speed     (optional) extra walk and sprint speed while it's worn, a share (0.05 = +5%;
+--             SprintController; armour and Swiftness together never pass Armor.MAX_SPEED)
+--             Bonuses (2026-10-22, the user: beginner sets have none, later ones one,
+--             later still both, growing big): World 1 none; World 2 Woodland Hide +5% speed,
+--             Heartwood Bark +0.25% regen; World 3 Cave Runner +10% speed, Crystal Queen
+--             +0.5% regen and +8% speed; Worlds 4-7 both, up to about +2% / +25%.
 --   sell      coins for selling it from the Inventory (placeholder, 2026-10-20)
 --   icon      its drawn picture (designed on the Crafting & Armor canvas, art/icons/)
+
+-- World scale (the rescale, 2026-10-24): coins and sell prices go x10 a world, and health is set so every set
+-- adds about a quarter to a third of the level's max HP when it unlocks (the user: only enemy damage has to follow
+-- the x10; armour, weapons, enemy health and drop rates follow what plays right against it): Farmhand's Gear 35 of
+-- 145 at level 5, Harvest Knight 75 of 331 at 14, Woodland Hide 350 of 1,202 at 28, Heartwood Bark 750 of 2,089 at
+-- 34, Cave Runner 5,500 of 19,055 at 58, Crystal Queen 13,000 of 36,308 at 65 (World 2's 29% / 36%; they were
+-- 3,500 / 7,500, x10 World 2's, until their levels moved up). Defence, regen and speed are shares and don't scale.
 
 local Armor = {}
 
@@ -41,9 +55,14 @@ export type ArmorDef = {
 	recipe: { Ingredient },
 	defense: number,
 	health: number,
+	regen: number?,
+	speed: number?,
 	sell: number?,
 	icon: string?,
 }
+
+-- Worn armour and a Swiftness potion together never make walking more than this much faster.
+Armor.MAX_SPEED = 0.5
 
 Armor.Defs = {
 	-- ==================== World 1 (The Sunny Meadows) ====================
@@ -94,17 +113,19 @@ Armor.Defs = {
 		name = "Woodland Hide",
 		blurb = "Fox fur and tusk toggles. Warm and tough.",
 		world = 2,
-		sell = 490,
+		sell = 620,
 		order = 3,
 		rarity = "Rare",
-		level = 20,
-		coins = 1200,
+		level = 28, -- 20 until 2026-10-21: players arrive at 25, so it unlocked on arrival
+		coins = 1500,
 		recipe = {
 			{ id = "FoxFur", count = 15 },
 			{ id = "BoarTusk", count = 10 },
+			{ id = "RedwoodLog", count = 10 }, -- gathered (2026-10-21, user: like World 1's sets)
 		},
 		defense = 0.25,
-		health = 110,
+		health = 350,
+		speed = 0.05,
 	},
 	HeartwoodBark = {
 		id = "HeartwoodBark",
@@ -112,38 +133,42 @@ Armor.Defs = {
 		name = "Heartwood Bark",
 		blurb = "Living bark, bear claws and the ranger's badge.",
 		world = 2,
-		sell = 1000,
+		sell = 1500,
 		order = 4,
 		rarity = "Epic",
-		level = 27,
-		coins = 3500,
+		level = 34, -- 27 until 2026-10-21: Rowan's second level step, like Harvest Knight and Dale's
+		coins = 7500,
 		recipe = {
 			{ id = "BearClaw", count = 10 },
 			{ id = "HeartwoodSap", count = 3 },
 			{ id = "RangerBadge", count = 1 },
+			{ id = "RedwoodLog", count = 12 }, -- gathered (2026-10-21)
+			{ id = "AmberSap", count = 1 },
 		},
 		defense = 0.32,
-		health = 160,
+		health = 750,
+		regen = 0.0025,
 	},
 	-- ==================== World 3 (The Crystal Caverns), 2026-10-13 ====================
-	-- Trial numbers carrying on World 2's climb. No icons drawn yet.
 	CaveRunner = {
 		id = "CaveRunner",
 		icon = "rbxassetid://114489790834583",
 		name = "Cave Runner",
 		blurb = "Golem stone with a glowing core and stone bat wings.",
 		world = 3,
-		sell = 2200,
+		sell = 6200,
 		order = 5,
 		rarity = "Epic",
-		level = 35,
-		coins = 2400,
+		level = 58, -- 53 until 2026-10-24: Pip's EXP rewards got players there in under 4 minutes
+		coins = 15000,
 		recipe = {
 			{ id = "BatWing", count = 15 },
 			{ id = "GolemPebble", count = 10 },
+			{ id = "IronOre", count = 12 }, -- mined (2026-10-24), like Woodland Hide's Redwood Logs
 		},
 		defense = 0.38,
-		health = 220,
+		health = 5500,
+		speed = 0.10,
 	},
 	CrystalQueen = {
 		id = "CrystalQueen",
@@ -151,18 +176,22 @@ Armor.Defs = {
 		name = "Crystal Queen",
 		blurb = "Spider carapace, the Queen's hourglass and a burst of crystals.",
 		world = 3,
-		sell = 4300,
+		sell = 15000,
 		order = 6,
 		rarity = "Legendary",
-		level = 42,
-		coins = 7000,
+		level = 65, -- 59 until 2026-10-24; Pip's second level step, like Heartwood Bark and Rowan's
+		coins = 75000,
 		recipe = {
 			{ id = "GolemCrystal", count = 10 },
 			{ id = "QueensSilk", count = 3 },
 			{ id = "MinersLantern", count = 1 },
+			{ id = "CrystalShard", count = 12 }, -- mined (2026-10-24), like Heartwood Bark's logs and sap
+			{ id = "RawGem", count = 1 },
 		},
 		defense = 0.44,
-		health = 280,
+		health = 13000,
+		regen = 0.005,
+		speed = 0.08,
 	},
 } :: { [string]: ArmorDef }
 

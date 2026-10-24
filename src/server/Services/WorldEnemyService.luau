@@ -319,12 +319,19 @@ end
 
 -- Weapon damage from MeleeService. Returns true when the hit killed the enemy,
 -- which is then defeated (credited to `attacker`).
-function WorldEnemyService.damage(enemyId: string, amount: number, attacker: Player?): boolean
+function WorldEnemyService.damage(enemyId: string, amount: number, attacker: Player?, crit: boolean?): boolean
 	local enemy = enemies[enemyId]
 	if not enemy or not enemy.alive then
 		return false
 	end
 	enemy.hp = math.max(0, enemy.hp - math.max(0, math.floor(amount + 0.5)))
+	-- Who landed the hit ("HitBy", their UserId), set before Hp like CritHp: only that
+	-- player's screen draws the damage bubble and, on the killing hit, the BONK
+	-- (2026-10-23, the user: other players shouldn't see someone else's).
+	enemy.instance:SetAttribute("HitBy", if attacker then attacker.UserId else nil)
+	-- A critical hit marks the HP it left ("CritHp"), set before Hp so the client
+	-- reads both together and draws the gold bubble; any other hit clears it.
+	enemy.instance:SetAttribute("CritHp", if crit then enemy.hp else nil)
 	if enemy.hp <= 0 then
 		WorldEnemyService.defeat(enemyId, attacker)
 		return true

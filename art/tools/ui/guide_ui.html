@@ -1,0 +1,54 @@
+<!doctype html>
+<!-- Quest guide + Worlds arrows art (2026-10-21, the user's picks on
+     https://claude.ai/artifact/BW6XYrhkThRjExFbRB41Xj: guide button C, guide arrow C,
+     Worlds arrows B). Render with: py svg_render.py guide_ui.html ../../ui/quest 512
+     then open the printed page; each <svg data-export> becomes <name>.png (the worlds_* ones
+     live in art/ui/worlds). -->
+<html><body style="background:#8fd3f0">
+
+<!-- the guide arrow decal: points up the image (the decal's top edge is the part's +Z) -->
+<svg data-export="guide_arrow" viewBox="0 0 256 256" width="256" height="256">
+  <defs><linearGradient id="ga" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe36b"/><stop offset="1" stop-color="#f5a10f"/></linearGradient></defs>
+  <path d="M128 16 L224 118 L170 118 L170 206 L86 206 L86 118 L32 118 Z" transform="translate(0 26)" fill="#ff8a1f" stroke="#2b1b3d" stroke-width="14" stroke-linejoin="round"/>
+  <path d="M128 16 L224 118 L170 118 L170 206 L86 206 L86 118 L32 118 Z" fill="url(#ga)" stroke="#2b1b3d" stroke-width="14" stroke-linejoin="round"/>
+  <path d="M70 100 L122 44" stroke="#fffbe0" stroke-width="11" stroke-linecap="round" opacity="0.9"/>
+  <path d="M106 130 L106 186" stroke="#fffbe0" stroke-width="11" stroke-linecap="round" opacity="0.6"/>
+</svg>
+
+<!-- the guide button's map pin, on and off -->
+<svg data-export="guide_pin_on" viewBox="0 0 128 128" width="128" height="128">
+  <path d="M64 118 C64 118 22 74 22 48 A42 42 0 0 1 106 48 C106 74 64 118 64 118 Z" fill="#ff6464" stroke="#2b1b3d" stroke-width="8" stroke-linejoin="round"/>
+  <path d="M40 40 A26 26 0 0 1 58 24" fill="none" stroke="#ffc4c4" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="64" cy="48" r="15" fill="#ffffff" stroke="#2b1b3d" stroke-width="7"/>
+</svg>
+<svg data-export="guide_pin_off" viewBox="0 0 128 128" width="128" height="128">
+  <path d="M64 118 C64 118 22 74 22 48 A42 42 0 0 1 106 48 C106 74 64 118 64 118 Z" fill="#c4d9de" stroke="#2b1b3d" stroke-width="8" stroke-linejoin="round"/>
+  <path d="M40 40 A26 26 0 0 1 58 24" fill="none" stroke="#e9f4f6" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="64" cy="48" r="15" fill="#ffffff" stroke="#2b1b3d" stroke-width="7"/>
+</svg>
+
+<!-- the Worlds panel's gold arrows (with their lip) -->
+<svg data-export="worlds_next" viewBox="0 0 128 128" width="128" height="128">
+  <defs><linearGradient id="wn" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe36b"/><stop offset="1" stop-color="#f5a10f"/></linearGradient></defs>
+  <circle cx="64" cy="70" r="52" fill="#b0600a" stroke="#2b1b3d" stroke-width="7"/>
+  <circle cx="64" cy="60" r="52" fill="url(#wn)" stroke="#2b1b3d" stroke-width="7"/>
+  <path d="M30 44 A38 38 0 0 1 58 22" fill="none" stroke="#fff6c2" stroke-width="7" stroke-linecap="round"/>
+  <path d="M52 34 L90 60 L52 86 Z" fill="#ffffff" stroke="#2b1b3d" stroke-width="7" stroke-linejoin="round"/>
+</svg>
+<svg data-export="worlds_prev" viewBox="0 0 128 128" width="128" height="128">
+  <defs><linearGradient id="wp" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe36b"/><stop offset="1" stop-color="#f5a10f"/></linearGradient></defs>
+  <circle cx="64" cy="70" r="52" fill="#b0600a" stroke="#2b1b3d" stroke-width="7"/>
+  <circle cx="64" cy="60" r="52" fill="url(#wp)" stroke="#2b1b3d" stroke-width="7"/>
+  <path d="M30 44 A38 38 0 0 1 58 22" fill="none" stroke="#fff6c2" stroke-width="7" stroke-linecap="round"/>
+  <path d="M76 34 L38 60 L76 86 Z" fill="#ffffff" stroke="#2b1b3d" stroke-width="7" stroke-linejoin="round"/>
+</svg>
+
+<!-- a locked world's dot -->
+<svg data-export="worlds_lock" viewBox="0 0 64 64" width="64" height="64">
+  <path d="M20 30 V22 A12 12 0 0 1 44 22 V30" fill="none" stroke="#2b1b3d" stroke-width="10" stroke-linecap="round"/>
+  <path d="M20 30 V22 A12 12 0 0 1 44 22 V30" fill="none" stroke="#8aa3aa" stroke-width="4" stroke-linecap="round"/>
+  <rect x="12" y="28" width="40" height="30" rx="7" fill="#8aa3aa" stroke="#2b1b3d" stroke-width="5"/>
+  <circle cx="32" cy="41" r="4.5" fill="#2b1b3d"/><path d="M32 43 V50" stroke="#2b1b3d" stroke-width="4" stroke-linecap="round"/>
+</svg>
+
+</body></html>

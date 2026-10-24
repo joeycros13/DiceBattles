@@ -20,7 +20,7 @@
 --              Weld (sockets, attach, rigidify)
 --   feel       Effects + EffectPresets (pooled particles, flashes, trails, sound)
 --              CameraFX (FOV zoom layers; no shake, by the user's rule)
---   content    Clips.Locomotion  Clips.Weapons  Clips.Enemies  Clips.Critters
+--   content    Clips.Locomotion  Clips.Weapons  Clips.Enemies  Clips.Critters  Clips.Hurt
 --
 -- Everything that runs per frame is a Scheduler system, in one fixed order:
 --   Joints  (PreSimulation, after Roblox's Animator)  50 Animator.joints
@@ -60,6 +60,7 @@ local Animation = {
 		Weapons = require(script.Clips.Weapons),
 		Enemies = require(script.Clips.Enemies),
 		Critters = require(script.Clips.Critters),
+		Hurt = require(script.Clips.Hurt),
 	},
 }
 

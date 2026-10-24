@@ -65,17 +65,15 @@ local Infuse = require(Config:WaitForChild("Infuse"))
 local Potions = require(Config:WaitForChild("Potions"))
 -- stat upgrades (Config/Upgrades): Attack, Defense and Attack Speed
 local Upgrades = require(Config:WaitForChild("Upgrades"))
+local Bonuses = require(Config:WaitForChild("Bonuses"))
 local Weld = require(Shared:WaitForChild("Animation"):WaitForChild("Weld"))
 
 local MeleeService = {}
 
 -- An admin's own damage multiplier (the admin panel's Damage card, 2026-10-12; replaced the old
--- Studio-only testDamageMultiplier). AdminService sets the player's "DamageMultiplier" attribute;
--- it isn't saved, so everyone starts each session at x1.
-local function damageMultiplier(player: Player): number
-	local value = player:GetAttribute("DamageMultiplier")
-	return if type(value) == "number" and value > 0 then value else 1
-end
+-- Studio-only testDamageMultiplier) is the player's "DamageMultiplier" attribute, read by
+-- Config/Bonuses.damage with the Strength potion and the Attack upgrade; it isn't saved, so
+-- everyone starts each session at x1.
 -- Balance.Melee.testStartWeapons too: owned from the start, Studio only.
 local TEST_START_WEAPONS: { string } = if RunService:IsStudio() then (Balance.Melee.testStartWeapons or {}) else {}
 
@@ -553,6 +551,8 @@ local function beginAttack(enemy: any, fight: Fight, melee: any, now: number)
 			-- and the Defense upgrade cuts it again (Config/Upgrades)
 			local guard = Upgrades.value(target, "Defense")
 			humanoid:TakeDamage(math.max(1, math.floor(melee.damage * (1 - defense) * skin * guard + 0.5)))
+			-- every client shows the hit on that body; the hit player stumbles back from here
+			deps.Remotes.getEvent("PlayerHurt"):FireAllClients({ character = target.Character, from = fight.position })
 		end
 	end)
 end
@@ -715,7 +715,12 @@ function MeleeService.WeaponHit(player: Player, targets: any)
 		landed += 1
 		-- some weapons (the Toadstool Mace) ignore armour (def.ignoreArmor)
 		local armor = if def.ignoreArmor then 0 else (melee.armor or 0)
-		local died = WorldEnemyService.damage(enemy.id, def.damage * damageMultiplier(player) * Potions.multiplier(player, "Strength") * Upgrades.value(player, "Attack") * (1 - armor), player)
+		-- each target rolls its own crit: Balance.Melee's 10% for 1.5x, raised by the
+		-- Crit Chance and Crit Damage upgrades (their level 0 is that base)
+		local crit = math.random() < Upgrades.value(player, "CritChance")
+		-- Strength and the Attack upgrade add their shares, the admin test multiplier on top (Config/Bonuses)
+		local damage = def.damage * Bonuses.damage(player) * (1 - armor)
+		local died = WorldEnemyService.damage(enemy.id, if crit then damage * Upgrades.value(player, "CritDamage") else damage, player, crit)
 		if died then
 			fights[enemy.id] = nil
 		else

@@ -32,6 +32,11 @@
 --     WeaponCards with their kind on the pill; Give / Remove send the `tool` action;
 --   PagePotions/List (2026-10-19): every potion (Config/Potions) per tier, on
 --     MaterialCards (count on the pill); Give / Take send the `potion` action;
+--   PageUpgrades/List (2026-10-22): a Templates/UpgradeAllRow (Icon, Texts/LineName, Texts/Note,
+--     MaxAll / ResetAll = the `upgradeAll` action at the top level or 0), then a
+--     Templates/UpgradeRow per upgrade in Config/Upgrades order (Icon, Texts/LineName,
+--     Texts/Note "Level 2 of 24 · x1.20 crit chance", AmountField/Amount = a level, Set =
+--     the `upgrade` action to that level, Up = one level up);
 --   PageMobs/List: Templates/WorldHeader, then a Templates/MobRow per enemy kind
 --     (Portrait, MobName, Note, Respawn);
 --   PageQuests/List (2026-10-19): a Templates/QuestRow per questline (Portrait = the
@@ -56,6 +61,7 @@ local Materials = require(Config:WaitForChild("Materials"))
 local Potions = require(Config:WaitForChild("Potions"))
 local Quests = require(Config:WaitForChild("Quests"))
 local Tools = require(Config:WaitForChild("Tools"))
+local Upgrades = require(Config:WaitForChild("Upgrades"))
 local Weapons = require(Config:WaitForChild("Weapons"))
 local Worlds = require(Config:WaitForChild("Worlds"))
 local Leveling = require(Config:WaitForChild("Leveling"))
@@ -554,6 +560,70 @@ local function renderPotions()
 	end
 end
 
+-- ==================== upgrades page ====================
+
+local function renderUpgrades()
+	local pageFrame = find("PageUpgrades")
+	local list = pageFrame and pageFrame:FindFirstChild("List")
+	local templates = gui and gui:FindFirstChild("Templates")
+	local rowTemplate = templates and templates:FindFirstChild("UpgradeRow")
+	local allTemplate = templates and templates:FindFirstChild("UpgradeAllRow")
+	if not (list and rowTemplate and allTemplate) then
+		return
+	end
+	local max = Upgrades.maxLevel()
+	if not list:FindFirstChild("All") then
+		local all = allTemplate:Clone()
+		all.Name = "All"
+		all.Visible = true
+		all.LayoutOrder = 0
+		find("LineName", all).Text = Text.allUpgrades
+		find("Note", all).Text = Text.allUpgradesNote
+		setLabel(find("MaxAll", all), Text.maxAll)
+		setLabel(find("ResetAll", all), Text.resetAll)
+		wireButton(find("MaxAll", all), function()
+			ask({ action = "upgradeAll", level = max })
+		end)
+		wireButton(find("ResetAll", all), function()
+			ask({ action = "upgradeAll", level = 0 })
+		end)
+		all.Parent = list
+	end
+	for index, def in Upgrades.list() do
+		local id = def.id
+		local row = list:FindFirstChild(id)
+		if not row then
+			row = rowTemplate:Clone()
+			row.Name = id
+			row.Visible = true
+			row.LayoutOrder = index
+			find("Icon", row).Image = def.icon
+			find("LineName", row).Text = def.name
+			setLabel(find("Set", row), Text.setLevel)
+			setLabel(find("Up", row), Text.upOne)
+			local box = find("Amount", row)
+			wireButton(find("Set", row), function()
+				local level = tonumber(box and box.Text or "")
+				if not level then
+					status(false, Text.badNumber)
+					return
+				end
+				ask({ action = "upgrade", id = id, level = level })
+			end)
+			wireButton(find("Up", row), function()
+				ask({ action = "upgrade", id = id, level = Upgrades.level(player, id) + 1 })
+			end)
+			row.Parent = list
+		end
+		local level = Upgrades.level(player, id)
+		find("Note", row).Text = Text.upgradeNote:format(level, max, Upgrades.describe(def, level))
+		local box = find("Amount", row)
+		if box and box:IsA("TextBox") and not box:IsFocused() then
+			box.Text = tostring(level)
+		end
+	end
+end
+
 -- ==================== quests page ====================
 
 local function renderQuests()
@@ -696,7 +766,7 @@ end
 
 local function showPage(name: string)
 	page = name
-	for _, n in { "PagePlayer", "PageWeapons", "PageArmor", "PageTools", "PageMaterials", "PagePotions", "PageQuests", "PageMobs" } do
+	for _, n in { "PagePlayer", "PageWeapons", "PageArmor", "PageTools", "PageMaterials", "PagePotions", "PageUpgrades", "PageQuests", "PageMobs" } do
 		local p = find(n)
 		if p then
 			p.Visible = n == name
@@ -722,6 +792,8 @@ local function showPage(name: string)
 		renderMaterials()
 	elseif name == "PagePotions" then
 		renderPotions()
+	elseif name == "PageUpgrades" then
+		renderUpgrades()
 	elseif name == "PageQuests" then
 		renderQuests()
 	else
@@ -867,7 +939,7 @@ function AdminUI.start()
 			pill.BackgroundTransparency = 1
 			setLabel(pill, "")
 		end
-		for _, name in { "PageWeapons", "PageArmor", "PageTools", "PageMaterials", "PagePotions", "PageQuests", "PageMobs" } do
+		for _, name in { "PageWeapons", "PageArmor", "PageTools", "PageMaterials", "PagePotions", "PageUpgrades", "PageQuests", "PageMobs" } do
 			fitCanvas(find(name):FindFirstChild("List"))
 		end
 		showPage(page)
@@ -890,6 +962,9 @@ function AdminUI.start()
 		player:GetAttributeChangedSignal("OwnedTools"):Connect(live("PageTools", renderTools))
 		player:GetAttributeChangedSignal("Materials"):Connect(live("PageMaterials", renderMaterials))
 		player:GetAttributeChangedSignal("Potions"):Connect(live("PagePotions", renderPotions))
+		for _, def in Upgrades.list() do
+			player:GetAttributeChangedSignal(Upgrades.attr(def.id)):Connect(live("PageUpgrades", renderUpgrades))
+		end
 		for _, id in Quests.order do
 			for _, field in { "Step", "State" } do
 				player:GetAttributeChangedSignal(Quests.attr(field, id)):Connect(live("PageQuests", renderQuests))

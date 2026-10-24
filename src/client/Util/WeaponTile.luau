@@ -8,8 +8,8 @@
 --
 -- Template pieces: Skin (rarity art), Picture (the weapon's drawn icon), Icon
 -- (a ViewportFrame, used when a weapon has no drawn icon), ItemName, Stat/Value
--- ("50 Dmg"), Rim (UIStroke), EquippedBadge, SellMark. Attributes:
--- Skin_<Rarity>, DamageFormat, UnknownImage (the question mark shown for a weapon
+-- ("7.5 DPS"), Rim (UIStroke), EquippedBadge, SellMark. Attributes:
+-- Skin_<Rarity>, DpsFormat ("%s DPS"), UnknownImage (the question mark shown for a weapon
 -- or material not found yet, user 2026-10-12; without it the old dark silhouette
 -- in SilhouetteColor), UnknownTileColor (the dimmed tile), and the Rim /
 -- EquippedRim / SellRim colours and thicknesses the Inventory uses.
@@ -19,9 +19,17 @@
 --   WeaponTile.skin(rarity)          the rarity's skin image
 --   WeaponTile.attribute(name)       any template attribute
 --   WeaponTile.showModel(viewport, id) a weapon framed in a 3D view
+--   WeaponTile.dps(def, base?, who?) / dpsText(def, base?, who?)  a weapon's damage per second as the
+--                                    player swings it (Config/Bonuses.dps: the Worldheart tier,
+--                                    the Attack Speed upgrade, Strength, the Attack upgrade...;
+--                                    2026-10-23, the user: every screen but the Index shows
+--                                    your real numbers); base = true for the Index's plain
+--                                    numbers (the Worldheart tier only). The pill shows it and
+--                                    the Inventory ranks weapons by it (2026-10-22, the user:
+--                                    damage alone made Equip Best pick slow secret weapons)
 -- opts: known (false = a question mark on a dimmed tile), name / stat (false
 -- hides the tile's own name / damage pill where the screen shows them itself),
--- statText (the pill's words instead of "N Dmg": armour sets and materials use
+-- statText (the pill's words instead of "N DPS": armour sets and materials use
 -- the same tile, 2026-10-12, with "10% Def" / "×15").
 -- Any def with an id, name, rarity and icon works: Config/Armor sets and
 -- Config/Materials entries are shown on this tile too.
@@ -31,6 +39,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 -- the Worldheart Blade's pill shows the player's own tier (Config/Infuse)
 local Infuse = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"):WaitForChild("Infuse"))
+local Bonuses = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"):WaitForChild("Bonuses"))
+
+local Format = require(script.Parent:WaitForChild("Format"))
 
 local WeaponTile = {}
 
@@ -47,6 +58,30 @@ function WeaponTile.attribute(name: string, fallback: any): any
 	local template = WeaponTile.template()
 	local value = template and template:GetAttribute(name)
 	return if value ~= nil then value else fallback
+end
+
+-- A weapon's damage per second as the player swings it (Config/Bonuses), or with `base`
+-- only its Worldheart tier (Infuse.adjust), as the Index shows it. `who` is whose bonuses
+-- and tier count (default the local player; the profile cards pass the player shown).
+function WeaponTile.dps(def: any, base: boolean?, who: Player?): number
+	local holder = who or Players.LocalPlayer
+	if not base then
+		return Bonuses.dps(holder, def)
+	end
+	local swing = Infuse.adjust(holder, def)
+	local damage, cooldown = swing.damage or 0, swing.cooldown or 1
+	return if cooldown > 0 then damage / cooldown else damage
+end
+
+-- "7.5", "1,571": a weapon's DPS as a number, one decimal below 100, whole with commas above.
+function WeaponTile.dpsNumber(def: any, base: boolean?, who: Player?): string
+	local dps = WeaponTile.dps(def, base, who)
+	return if dps < 100 then (("%.1f"):format(dps):gsub("%.0$", "")) else Format.commas(math.floor(dps + 0.5))
+end
+
+-- "7.5 DPS", "1,571 DPS"
+function WeaponTile.dpsText(def: any, base: boolean?, who: Player?): string
+	return (WeaponTile.attribute("DpsFormat", "%s DPS") :: string):format(WeaponTile.dpsNumber(def, base, who))
 end
 
 function WeaponTile.skin(rarity: string?): string
@@ -181,8 +216,9 @@ function WeaponTile.fill(tile: GuiObject, def: any, opts: Options?)
 	if stat and stat:IsA("GuiObject") then
 		stat.Visible = o.stat ~= false and known
 		local value = stat:FindFirstChild("Value", true)
-		if value and value:IsA("TextLabel") then
-			value.Text = o.statText or (WeaponTile.attribute("DamageFormat", "%d Dmg") :: string):format(Infuse.adjust(Players.LocalPlayer, def).damage or 0)
+		-- the DPS is worked out only for a pill that shows it (items without a swing never do)
+		if value and value:IsA("TextLabel") and (o.statText or stat.Visible) then
+			value.Text = o.statText or WeaponTile.dpsText(def)
 		end
 	end
 	for _, name in { "EquippedBadge", "SellMark" } do

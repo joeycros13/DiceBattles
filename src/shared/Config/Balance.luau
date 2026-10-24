@@ -36,6 +36,10 @@ Balance.Melee = {
 	-- and network delay between where the client drew an enemy and where the
 	-- server has it.
 	hitSlack = 4,
+	-- Critical hits (2026-10-21, the user): every weapon hit has this chance to deal
+	-- critMultiplier times its damage, shown as a gold "CRIT!" bubble (BonkPop.hit).
+	critChance = 0.10,
+	critMultiplier = 1.5,
 	tickRate = 20, -- AI updates per second
 	-- For playtesting: weapons every player owns from the start, Studio only; the
 	-- first one starts selected in the hotbar. Empty since 2026-10-11 (the user

@@ -13,8 +13,10 @@
 --   Bundles      coin bundles: `coins` x WorldScale[the player's highest world
 --                unlocked]. Repeatable.
 --   Passes       permanent multipliers: luck (every weapon drop chance), coins
---                and EXP from kills. Everything owned multiplies together (the
---                user's call): VIP 1.25 x 2x Luck x a 2x boost = 5x luck.
+--                and EXP from kills. Everything owned ADDS its share (2026-10-23,
+--                the user; it multiplied before): VIP 1.25 + 2x Luck + a 2x boost =
+--                1 + 0.25 + 1 + 1 = 3.25x luck, and the upgrades add on top
+--                (Config/Bonuses).
 --                VIP also gives the gold [VIP] chat tag.
 --   Boosts       timed multipliers, bought again and again; buying one that is
 --                running adds its time. The clock only runs while in game.
@@ -26,8 +28,9 @@ export type Bundle = { id: string, name: string, coins: number, productId: numbe
 export type Pass = { id: string, name: string, passId: number, price: number, luck: number?, coins: number?, exp: number?, chatTag: boolean? }
 export type Boost = { id: string, name: string, productId: number, price: number, seconds: number, luck: number?, coins: number?, exp: number? }
 
--- Coin bundles grow with the highest world the player has unlocked.
-Shop.WorldScale = { 1, 4, 16 }
+-- Coin bundles grow with the highest world the player has unlocked: x10 a world since
+-- 2026-10-23 (it was 1, 4, 16), like the gates' coins (Config/Leveling, world scale).
+Shop.WorldScale = { 1, 10, 100, 1000, 10000, 100000, 1000000, 10000000 }
 
 Shop.Bundles = {
 	Handful = { id = "Handful", name = "Handful", coins = 250, productId = 0, price = 25, order = 1 },

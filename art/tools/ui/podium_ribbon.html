@@ -1,0 +1,29 @@
+<!doctype html>
+<!-- Leaderboard podium crown and the Worlds panel's title ribbon (2026-10-21, the user's picks
+     on https://claude.ai/artifact/BW6XYrhkThRjExFbRB41Xj: podium A, Worlds title B).
+     Render with: py svg_render.py podium_ribbon.html <out> 512, then podium_crown.png goes to
+     art/ui/leaderboard and worlds_ribbon.png to art/ui/worlds -->
+<html><body style="background:#8fd3f0">
+
+<svg data-export="podium_crown" viewBox="0 0 128 96" width="128" height="96">
+  <path d="M10 84 L16 18 L42 50 L64 10 L86 50 L112 18 L118 84 Z" fill="#b0600a" stroke="#2b1b3d" stroke-width="5" stroke-linejoin="round" transform="translate(0 9)"/>
+  <defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe36b"/><stop offset="1" stop-color="#f5a10f"/></linearGradient></defs>
+  <path d="M10 84 L16 18 L42 50 L64 10 L86 50 L112 18 L118 84 Z" fill="url(#cg)" stroke="#2b1b3d" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M14 70 H114" stroke="#2b1b3d" stroke-width="4"/>
+  <circle cx="64" cy="52" r="8" fill="#e2382c" stroke="#2b1b3d" stroke-width="5"/>
+  <circle cx="36" cy="60" r="5" fill="#14a9d3" stroke="#2b1b3d" stroke-width="4"/>
+  <circle cx="92" cy="60" r="5" fill="#14a9d3" stroke="#2b1b3d" stroke-width="4"/>
+  <path d="M26 40 L34 50" stroke="#fff6c2" stroke-width="6" stroke-linecap="round"/>
+</svg>
+
+<svg data-export="worlds_ribbon" viewBox="0 0 640 176" width="640" height="176">
+  <defs><linearGradient id="rg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe36b"/><stop offset="1" stop-color="#f5a10f"/></linearGradient></defs>
+  <path d="M12 58 H104 V150 H12 L44 104 Z" fill="#d88a0b" stroke="#2b1b3d" stroke-width="9" stroke-linejoin="round"/>
+  <path d="M628 58 H536 V150 H628 L596 104 Z" fill="#d88a0b" stroke="#2b1b3d" stroke-width="9" stroke-linejoin="round"/>
+  <path d="M104 150 L84 130 H104 Z M536 150 L556 130 H536 Z" fill="#8a4b00" stroke="#2b1b3d" stroke-width="7" stroke-linejoin="round"/>
+  <rect x="84" y="18" width="472" height="114" rx="18" fill="#b0600a" stroke="#2b1b3d" stroke-width="9" transform="translate(0 16)"/>
+  <rect x="84" y="18" width="472" height="114" rx="18" fill="url(#rg)" stroke="#2b1b3d" stroke-width="9"/>
+  <path d="M110 40 H530" stroke="#fff6c2" stroke-width="9" stroke-linecap="round" opacity="0.85"/>
+</svg>
+
+</body></html>

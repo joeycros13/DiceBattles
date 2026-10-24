@@ -11,8 +11,10 @@
 --     the purchase is confirmed. Gamepasses come from
 --     UserOwnsGamePassAsync on join and PromptGamePassPurchaseFinished, and are
 --     saved too (so Studio test passes stick).
---   * Multipliers: every owned pass and running boost multiplies together
---     (the user's call). Published on the player as "LuckBoost" (weapon drop
+--   * Multipliers: every owned pass and running boost ADDS its share (2026-10-23,
+--     the user: 1.5x + 2x = 2.5x; they multiplied until then, which took maxed luck to
+--     16.5x), and Config/Bonuses adds the upgrades' shares on top. Published on the
+--     player as "LuckBoost" (weapon drop
 --     chances, IndexService), "CoinBoost" (kill coins, CoinService) and
 --     "ExpBoost" (kill EXP, ExpService); also "OwnedPasses" (comma list),
 --     "VIP" (the chat tag, Client.Controllers.ChatTagController),
@@ -84,23 +86,24 @@ local function publishTimers(player: Player, s: State)
 end
 
 local function publish(player: Player, s: State)
+	-- each pass and boost adds its share (x2 = +1), Config/Bonuses
 	local luck, coins, exp = 1, 1, 1
 	local owned = {}
 	for id in s.passes do
 		local pass = Shop.Passes[id]
 		if pass then
 			table.insert(owned, id)
-			luck *= pass.luck or 1
-			coins *= pass.coins or 1
-			exp *= pass.exp or 1
+			luck += (pass.luck or 1) - 1
+			coins += (pass.coins or 1) - 1
+			exp += (pass.exp or 1) - 1
 		end
 	end
 	for id, left in s.boosts do
 		local boost = Shop.Boosts[id]
 		if boost and left > 0 then
-			luck *= boost.luck or 1
-			coins *= boost.coins or 1
-			exp *= boost.exp or 1
+			luck += (boost.luck or 1) - 1
+			coins += (boost.coins or 1) - 1
+			exp += (boost.exp or 1) - 1
 		end
 	end
 	table.sort(owned)

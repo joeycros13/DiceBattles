@@ -30,7 +30,7 @@
 --     from the DrinkMenu's CooldownText and the "PotionHealReady" attribute).
 --   * TopBar: the Filter dropdown (All / Weapons / Tools / Armor / Potions / Materials) and the
 --     SearchBox (matches names) narrow the grid.
---   * BottomBar: Equip Best equips the highest-damage weapon and the highest-defense
+--   * BottomBar: Equip Best equips the highest-DPS weapon (WeaponTile.dps) and the highest-defense
 --     set owned. Sell Mode (2026-10-20: everything sells but quest items and cores,
 --     Config/Sell) makes clicks pick tiles instead (SellMark + Sell* rim) and each tile's
 --     pill shows what it sells for (the template's SellFormat, or NoSellText for what
@@ -53,10 +53,14 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterGui = game:GetService("StarterGui")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
+local UiSound = require(script.Parent.Parent:WaitForChild("Util"):WaitForChild("UiSound"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = Shared:WaitForChild("Config")
 local Armor = require(Config:WaitForChild("Armor"))
+local Bonuses = require(Config:WaitForChild("Bonuses"))
+local Potions = require(Config:WaitForChild("Potions"))
+local Upgrades = require(Config:WaitForChild("Upgrades"))
 local Materials = require(Config:WaitForChild("Materials"))
 local Potions = require(Config:WaitForChild("Potions"))
 local Sell = require(Config:WaitForChild("Sell"))
@@ -155,8 +159,11 @@ local function ownedWeapons(): { Weapons.WeaponDef }
 			end
 		end
 	end
+	-- best first by damage per second as it swings (the Worldheart Blade's tier counted), so
+	-- Equip Best takes the fastest killer, not the hardest single hit
 	table.sort(list, function(a, b)
-		return if a.damage == b.damage then a.order < b.order else a.damage > b.damage
+		local da, db = WeaponTile.dps(a), WeaponTile.dps(b)
+		return if da == db then a.order < b.order else da > db
 	end)
 	return list
 end
@@ -218,7 +225,11 @@ local function renderButtons()
 	end
 end
 
--- The Weapon / Armor sockets: the equipped item's icon, or the placeholder.
+-- The Weapon / Armor sockets: the equipped item's rarity tile and icon, filling the whole
+-- socket (Inner/RarityTile is sized past Inner to the socket's edge, and the socket's own
+-- dashed Skin hides under it; 2026-10-22, the user), or the placeholder Skin + SlotIcon.
+-- A weapon is always selected (the Dagger at least), so only the Armor socket ever shows
+-- its placeholder.
 local function renderSockets()
 	local equipment = find("Equipment", "GuiObject")
 	local current = WeaponController.selected()
@@ -242,16 +253,143 @@ local function renderSockets()
 		if placeholder and placeholder:IsA("GuiObject") then
 			placeholder.Visible = icon == nil
 		end
+		local slotSkin = socket and socket:FindFirstChild("Skin")
+		if slotSkin and slotSkin:IsA("GuiObject") then
+			slotSkin.Visible = def == nil
+		end
+	end
+end
+
+-- The two stat cards beside the window (2026-10-22, option B on
+-- https://claude.ai/artifact/6LM4U8XgrVihfD1RrWvCMQ, both on the left as the user asked):
+--   Window/WeaponStats  the selected weapon: ItemName, Dps/Value (its DPS, WeaponTile.dps),
+--                       Row_Damage / Row_Range / Row_Speed (each Icon + Label + Value; the card's
+--                       RangeFormat "%s" studs and SpeedFormat "%s s" per swing)
+--   Window/ArmorStats   the worn set: ItemName (EmptyName when none), Row_Health / Row_Defense
+--                       (NoneText greyed, the card's Off* colours, while nothing is worn) and
+--                       Row_Regen / Row_Speed only when the set has that bonus (2026-10-22, the
+--                       user): Speed moves up into Regen's slot, and the card's Face / Lip /
+--                       Blocker end under the last row shown (each row's SlotY attribute keeps
+--                       its authored spot)
+-- Both show the player's real numbers (2026-10-23, the user: every bonus, everywhere but
+-- the Index): the weapon after its Worldheart tier, the Attack Speed upgrade and every damage
+-- bonus (Config/Bonuses.weapon), the set's health after the Health upgrade.
+local function setRow(card: Instance, row: string, value: string, on: boolean)
+	local frame = card:FindFirstChild(row, true)
+	if not (frame and frame:IsA("GuiObject")) then
+		return
+	end
+	local function colour(name: string, fallback: Color3): Color3
+		local c = card:GetAttribute(name)
+		return if typeof(c) == "Color3" then c else fallback
+	end
+	local state = if on then "On" else "Off"
+	frame.BackgroundColor3 = colour(state .. "Fill", frame.BackgroundColor3)
+	local label = frame:FindFirstChild("Label")
+	if label and label:IsA("TextLabel") then
+		label.TextColor3 = colour(state .. "Label", label.TextColor3)
+	end
+	local text = frame:FindFirstChild("Value")
+	if text and text:IsA("TextLabel") then
+		text.Text = value
+		text.TextColor3 = colour(state .. "Value", text.TextColor3)
+	end
+	-- the row's Upgrades icon (2026-10-22) fades with a greyed row (the card's OffIconTransparency)
+	local icon = frame:FindFirstChild("Icon")
+	if icon and icon:IsA("ImageLabel") then
+		local off = card:GetAttribute("OffIconTransparency")
+		icon.ImageTransparency = if on then 0 else (if type(off) == "number" then off else 0.55)
+	end
+end
+
+local function renderStatCards()
+	local weaponCard = find("WeaponStats", "GuiObject")
+	if weaponCard then
+		local def = WeaponController.selected()
+		local swing = def and Bonuses.weapon(player, def)
+		local name = weaponCard:FindFirstChild("ItemName", true)
+		if name and name:IsA("TextLabel") then
+			name.Text = def and def.name or ""
+		end
+		local dps = weaponCard:FindFirstChild("Dps", true)
+		local value = dps and dps:FindFirstChild("Value")
+		if value and value:IsA("TextLabel") then
+			value.Text = if def then WeaponTile.dpsNumber(def) else "0"
+		end
+		local range = (weaponCard:GetAttribute("RangeFormat") or "%s") :: string
+		local speed = (weaponCard:GetAttribute("SpeedFormat") or "%s s") :: string
+		setRow(weaponCard, "Row_Damage", Format.commas(math.floor((swing and swing.damage or 0) + 0.5)), true)
+		setRow(weaponCard, "Row_Range", range:format(("%.1f"):format(swing and swing.reach or 0):gsub("%.0$", "")), true)
+		setRow(weaponCard, "Row_Speed", speed:format(("%.2f"):format(swing and swing.cooldown or 0):gsub("0$", "")), true)
+	end
+	local armorCard = find("ArmorStats", "GuiObject")
+	if armorCard then
+		local set = wornArmor()
+		local none = (armorCard:GetAttribute("NoneText") or "None") :: string
+		local name = armorCard:FindFirstChild("ItemName", true)
+		if name and name:IsA("TextLabel") then
+			name.Text = if set then set.name else (armorCard:GetAttribute("EmptyName") or "No armor") :: string
+		end
+		local function percent(share: number): string
+			return (("%.2f"):format(share * 100):gsub("0+$", ""):gsub("%.$", "")) .. "%"
+		end
+		setRow(armorCard, "Row_Health", if set then "+" .. Format.commas(math.floor(set.health * Bonuses.health(player) + 0.5)) else none, set ~= nil)
+		setRow(armorCard, "Row_Defense", if set then percent(set.defense) else none, set ~= nil)
+		local regen = set and set.regen or 0
+		local fast = set and set.speed or 0
+		setRow(armorCard, "Row_Regen", "+" .. percent(regen) .. "/s", true)
+		setRow(armorCard, "Row_Speed", "+" .. percent(fast), true)
+		-- only the bonuses the set has show, packed up under Defense
+		local slots = {}
+		for _, name in { "Row_Health", "Row_Defense", "Row_Regen", "Row_Speed" } do
+			local row = armorCard:FindFirstChild(name)
+			if row and row:IsA("GuiObject") then
+				local y = row:GetAttribute("SlotY")
+				if type(y) ~= "number" then
+					y = row.Position.Y.Scale
+					row:SetAttribute("SlotY", y)
+				end
+				table.insert(slots, { row = row, y = y })
+			end
+		end
+		local shown = { Row_Health = true, Row_Defense = true, Row_Regen = regen > 0, Row_Speed = fast > 0 }
+		local slot, bottom = 1, 0
+		for _, entry in slots do
+			local row = entry.row
+			row.Visible = shown[row.Name] == true
+			if row.Visible then
+				local y = slots[slot].y
+				row.Position = UDim2.new(row.Position.X, UDim.new(y, 0))
+				bottom = y + row.Size.Y.Scale
+				slot += 1
+			end
+		end
+		-- the drawn card ends the same gap under its last row as it was authored with
+		local last = slots[#slots]
+		if last then
+			local pad = 1 - (last.y + last.row.Size.Y.Scale)
+			for _, name in { "Face", "Lip", "Blocker" } do
+				local piece = armorCard:FindFirstChild(name)
+				if piece and piece:IsA("GuiObject") then
+					piece.Size = UDim2.new(piece.Size.X, UDim.new(bottom + pad, 0))
+				end
+			end
+		end
 	end
 end
 
 -- The Damage / Health / Defense cards under the character, and the item count
 -- in the header (its Format attribute sets the wording).
 local function renderStats(count: number)
+	renderStatCards()
+	-- the mini cards are the player's own totals: a hit's damage with every bonus, max
+	-- health, and the whole damage reduction (armour, Stoneskin and the Defense upgrade
+	-- multiply: Config/Bonuses)
 	local current = WeaponController.selected()
 	local damage = find("DamageValue", "TextLabel")
 	if damage then
-		damage.Text = Format.commas(current and current.damage or 0)
+		local swing = current and Bonuses.weapon(player, current)
+		damage.Text = Format.commas(math.floor((swing and swing.damage or 0) + 0.5))
 	end
 	local health = find("HealthValue", "TextLabel")
 	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
@@ -261,7 +399,9 @@ local function renderStats(count: number)
 	local defense = find("DefenseValue", "TextLabel")
 	if defense then
 		local value = player:GetAttribute("ArmorDefense")
-		defense.Text = math.floor((if type(value) == "number" then value else 0) * 100 + 0.5) .. "%"
+		local armour = 1 - math.clamp(if type(value) == "number" then value else 0, 0, 0.9)
+		local taken = armour * Potions.multiplier(player, "Stoneskin") * Upgrades.value(player, "Defense")
+		defense.Text = math.floor((1 - taken) * 100 + 0.5) .. "%"
 	end
 	renderSockets()
 	local capacity = find("Capacity", "GuiObject")
@@ -481,9 +621,15 @@ local function wireTile(st: TileState)
 				return deps.Remotes.getFunction("DrinkPotion"):InvokeServer(id)
 			end)
 			drinking = false
+			UiSound.play(if ok and okDrink then "Drink" else "Refuse")
 			if ok and okDrink then
 				openPotion = nil
 				drinkNote[id] = nil
+				-- a healing potion: + signs off the body and a green edge glow (HurtController)
+				local drunk = Potions.get(id)
+				if drunk and drunk.kind == "Health" and deps.Controllers.HurtController then
+					deps.Controllers.HurtController.healed()
+				end
 			else
 				drinkNote[id] = refusal(if ok then reason else nil)
 			end
@@ -595,7 +741,7 @@ doRender = function()
 	if shows.weapons then
 		for _, def in owned do
 			if matches(def.name) then
-				table.insert(entries, { kind = "weapon", def = def, rank = rank(def.rarity), typeRank = 1, strength = def.damage })
+				table.insert(entries, { kind = "weapon", def = def, rank = rank(def.rarity), typeRank = 1, strength = WeaponTile.dps(def) })
 			end
 		end
 	end
@@ -873,6 +1019,14 @@ end
 local function wirePanel(gui: ScreenGui)
 	panel = gui
 
+	-- the stat cards' Luckiest Guy words sit centred in their boxes (Util.FontDrop)
+	for _, name in { "WeaponStats", "ArmorStats" } do
+		local card = gui:FindFirstChild(name, true)
+		if card and deps.Util.FontDrop then
+			deps.Util.FontDrop.watch(card)
+		end
+	end
+
 	local grid = find("Grid", "ScrollingFrame")
 	local gridLayout = grid and grid:FindFirstChildOfClass("UIGridLayout")
 	if grid and gridLayout then
@@ -948,9 +1102,10 @@ local function wirePanel(gui: ScreenGui)
 			end
 			selling = true
 			local remote = sellRemote :: RemoteFunction
-			pcall(function()
-				remote:InvokeServer(lines)
+			local ok, sold = pcall(function()
+				return remote:InvokeServer(lines)
 			end)
+			UiSound.play(if ok and sold == true then "Purchase" else "Refuse")
 			selling = false
 			setSellMode(false)
 		end)
@@ -983,6 +1138,12 @@ local function wirePanel(gui: ScreenGui)
 	for _, name in { "OwnedWeapons", "OwnedArmor", "EquippedArmor", "Materials", "OwnedTools", "Potions" } do
 		player:GetAttributeChangedSignal(name):Connect(renderGrid)
 	end
+	-- every bonus the shown stats include (an upgrade bought, a potion starting or ending...)
+	for _, name in Bonuses.Watch do
+		player:GetAttributeChangedSignal(name):Connect(renderGrid)
+	end
+	player:GetAttributeChangedSignal("PotionTier_Stoneskin"):Connect(renderGrid)
+	player:GetAttributeChangedSignal(Upgrades.attr("Defense")):Connect(renderGrid)
 	-- the max-health change lands just after the armour's own attributes
 	player:GetAttributeChangedSignal("ArmorHealth"):Connect(function()
 		task.delay(0.1, renderGrid)

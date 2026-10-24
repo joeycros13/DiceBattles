@@ -125,12 +125,14 @@ function UpgradeService.start()
 		onPlayer(player)
 	end
 	-- Regen: the upgrade's extra share of max health every second, plus a running Regen
-	-- potion's (Config/Potions, 2026-10-20)
+	-- potion's (Config/Potions, 2026-10-20) and the worn armour's (Config/Armor, 2026-10-22)
 	task.spawn(function()
 		while true do
 			task.wait(REGEN_STEP)
 			for _, player in Players:GetPlayers() do
+				local armour = player:GetAttribute("ArmorRegen")
 				local extra = Upgrades.value(player, "Regen") + Potions.power(player, "Regen")
+					+ (if type(armour) == "number" then armour else 0)
 				local character = player.Character
 				local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 				if extra > 0 and humanoid and humanoid.Health > 0 and humanoid.Health < humanoid.MaxHealth then

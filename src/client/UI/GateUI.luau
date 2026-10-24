@@ -12,14 +12,14 @@
 --   * MaterialRow1, 2... (2026-10-19): one per entry of the gate's `materials`, the
 --     same pieces, with the material's icon on Icon (Text.material / youMaterial);
 --     rows past the list are hidden.
---   * Buy (Content: Label, Coin, Amount): Text.buy and the price when both are
---     met, Text.locked and the price when not, Text.unlocked once owned (no coin
---     or price). The gui's FillTop_ / FillBottom_ / Lip_ / Ink_<Met|Locked|
---     Unlocked> attributes colour the button. Pressing it while Met fires
---     Remotes.GateBuy { id } (GateService checks everything again); it dips
---     while held (its PressScale). While it can be pressed, hovering grows it
---     and its BuyLip (the lip's HoverScale) by the gui's HoverGrow and lightens
---     its fill by HoverLighten, so it reads as clickable.
+--   * Buy (Skin, Content: Lock, Label (+ Ink1..4, Face), Coin, Amount), one of the game's pill buttons
+--     (option A on the Quest Guide canvas, 2026-10-21): its Skin takes the gui's
+--     Skin_<Met|Locked|Unlocked> image and reads Text.buy / Text.locked /
+--     Text.unlocked alone (the requirements are the rows above it; its Lock, Coin and
+--     Amount stay hidden since 2026-10-21). It is Active only
+--     while Met, so Util.ButtonFx grows and squashes it (its FxScale) only then.
+--     Pressing it while Met fires Remotes.GateBuy { id } (GateService checks
+--     everything again).
 --   * Every gate part with the attribute OpensWithGate (the curtain and its
 --     vines, the SignBoard and its ropes) turns invisible and walk-through once
 --     the player's HighestWorld reaches the gate's world, and the sign itself is
@@ -28,7 +28,8 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TweenService = game:GetService("TweenService")
+
+local UiSound = require(script.Parent.Parent:WaitForChild("Util"):WaitForChild("UiSound"))
 
 local Config = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config")
 local Gates = require(Config:WaitForChild("Gates"))
@@ -36,7 +37,6 @@ local Materials = require(Config:WaitForChild("Materials"))
 
 local GateUI = {}
 
-local PRESS = 0.94
 local player = Players.LocalPlayer
 local deps: any = nil
 local buyRemote: RemoteEvent? = nil
@@ -135,7 +135,7 @@ local function stateOf(gate: Gates.Gate): string
 	return "Locked"
 end
 
-local function render(gui: SurfaceGui, gate: Gates.Gate, hovered: boolean)
+local function render(gui: SurfaceGui, gate: Gates.Gate)
 	local Text = Gates.Text
 	local state = stateOf(gate)
 	local unlocked = state == "Unlocked"
@@ -175,37 +175,33 @@ local function render(gui: SurfaceGui, gate: Gates.Gate, hovered: boolean)
 
 	local buy = gui:FindFirstChild("Buy")
 	local content = buy and buy:FindFirstChild("Content")
-	if buy and content then
-		local ink = attribute(gui, "Ink_" .. state, Color3.new(0, 0, 0))
-		setText(content:FindFirstChild("Label"), if unlocked then Text.unlocked elseif state == "Met" then Text.buy else Text.locked)
-		setText(content:FindFirstChild("Amount"), deps.Util.Format.coins(gate.coins))
-		for _, name in { "Coin", "Amount" } do
+	if buy and buy:IsA("GuiButton") and content then
+		-- the game's pill buttons (option A, 2026-10-21): green "Buy  2,500" once you can,
+		-- grey with a padlock and the price while locked; ButtonFx grows / squashes it
+		-- only while it's Active
+		-- just the word (2026-10-21, the user): the four requirements are listed above it,
+		-- so the button no longer repeats the price
+		-- the Label is the word's ink layer; its copies (Ink1..4 a pixel off each way, then the
+		-- white Face) fill the B's small counters, which a UIStroke leaves open (2026-10-21)
+		local label = content:FindFirstChild("Label")
+		local word = if unlocked then Text.unlocked elseif state == "Met" then Text.buy else Text.locked
+		setText(label, word)
+		for _, layer in if label then label:GetChildren() else {} do
+			setText(layer, word)
+		end
+		local show = { Label = true, Lock = false, Coin = false, Amount = false }
+		for name, visible in show do
 			local piece = content:FindFirstChild(name)
 			if piece and piece:IsA("GuiObject") then
-				piece.Visible = not unlocked
+				piece.Visible = visible
 			end
 		end
-		for _, name in { "Label", "Amount" } do
-			local piece = content:FindFirstChild(name)
-			local stroke = piece and piece:FindFirstChildOfClass("UIStroke")
-			if stroke then
-				stroke.Color = ink
-			end
+		local skin = buy:FindFirstChild("Skin")
+		local image = attribute(gui, "Skin_" .. state, nil)
+		if skin and skin:IsA("ImageLabel") and type(image) == "string" then
+			skin.Image = image
 		end
-		local gradient = buy:FindFirstChildOfClass("UIGradient")
-		if gradient then
-			local top: Color3 = attribute(gui, "FillTop_" .. state, Color3.new(1, 1, 1))
-			local bottom: Color3 = attribute(gui, "FillBottom_" .. state, Color3.new(1, 1, 1))
-			if hovered and state == "Met" then
-				local lighten = attribute(gui, "HoverLighten", 0.18)
-				top, bottom = top:Lerp(Color3.new(1, 1, 1), lighten), bottom:Lerp(Color3.new(1, 1, 1), lighten)
-			end
-			gradient.Color = ColorSequence.new(top, bottom)
-		end
-		local lip = gui:FindFirstChild("BuyLip")
-		if lip and lip:IsA("GuiObject") then
-			lip.BackgroundColor3 = attribute(gui, "Lip_" .. state, lip.BackgroundColor3)
-		end
+		buy.Active = state == "Met"
 	end
 	setOpen(modelOf(gate), unlocked)
 end
@@ -224,49 +220,30 @@ local function wire(gui: SurfaceGui)
 	end
 	deps.Util.FontDrop.watch(gui)
 
-	local hovered, pressed = false, false
 	local function update()
-		render(gui, gate, hovered)
+		render(gui, gate)
 	end
 
 	local buy = gui:FindFirstChild("Buy")
 	if buy and buy:IsA("GuiButton") then
-		local press = buy:FindFirstChild("PressScale")
-		local lip = gui:FindFirstChild("BuyLip")
-		local lipScale = lip and lip:FindFirstChild("HoverScale")
-		-- the button's scale is hover x press; the lip only follows the hover
-		local function rescale(time: number)
-			local grow = if hovered and stateOf(gate) == "Met" then attribute(gui, "HoverGrow", 1.05) else 1
-			local info = TweenInfo.new(time, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-			if press and press:IsA("UIScale") then
-				TweenService:Create(press, info, { Scale = grow * (if pressed then PRESS else 1) }):Play()
-			end
-			if lipScale and lipScale:IsA("UIScale") then
-				TweenService:Create(lipScale, info, { Scale = grow }):Play()
-			end
-		end
-		buy.MouseEnter:Connect(function()
-			hovered = true
-			update()
-			rescale(0.12)
-		end)
-		buy.MouseLeave:Connect(function()
-			hovered, pressed = false, false
-			update()
-			rescale(0.12)
-		end)
-		buy.MouseButton1Down:Connect(function()
-			if stateOf(gate) == "Met" then
-				pressed = true
-				rescale(0.06)
-			end
-		end)
-		buy.MouseButton1Up:Connect(function()
-			pressed = false
-			rescale(0.1)
-		end)
 		buy.Activated:Connect(function()
 			if stateOf(gate) == "Met" and buyRemote then
+				-- the gate opening (HighestWorld reaching it) plays the Purchase sound
+				local before = number("HighestWorld", 1)
+				local watch: RBXScriptConnection? = nil
+				watch = player:GetAttributeChangedSignal("HighestWorld"):Connect(function()
+					if number("HighestWorld", 1) > before then
+						UiSound.play("Purchase")
+					end
+					if watch then
+						watch:Disconnect()
+					end
+				end)
+				task.delay(5, function()
+					if watch then
+						watch:Disconnect()
+					end
+				end)
 				buyRemote:FireServer({ id = gate.id })
 			end
 		end)

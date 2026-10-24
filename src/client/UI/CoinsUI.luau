@@ -14,14 +14,18 @@
 --   * shown() / onShown() give what the counter shows right now, so other HUD
 --     pieces (the quest tracker) move in step with it instead of jumping
 --     ahead to the balance.
+--   * Each landing coin plays Util.UiSound's "CoinLand" (its pitch climbs through a spill).
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
+
+local UiSound = require(script.Parent.Parent:WaitForChild("Util"):WaitForChild("UiSound"))
 
 local CoinsUI = {}
 
 local HudFly: any = nil
 local Format: any = nil
+local FontDrop: any = nil
 local GUI_TIMEOUT = 15
 local player = Players.LocalPlayer
 
@@ -107,6 +111,7 @@ function CoinsUI.collect(from: Vector2, landed: (() -> ())?)
 	end
 	HudFly.fly(hud :: ScreenGui, template, from, icon :: GuiObject, attribute("FlySeconds", 0.55), function()
 		HudFly.bump(icon, attribute("BumpScale", 1.25))
+		UiSound.play("CoinLand")
 		if landed then
 			landed()
 		end
@@ -120,6 +125,7 @@ end
 function CoinsUI.init(injected: any)
 	HudFly = injected.Util.HudFly
 	Format = injected.Util.Format
+	FontDrop = injected.Util.FontDrop
 end
 
 function CoinsUI.start()
@@ -132,6 +138,10 @@ function CoinsUI.start()
 		hud = found
 		-- the counter stacks in WeaponHud/TopLeft under the player card
 		coinsFrame = found:FindFirstChild("Coins", true)
+		-- the count is Luckiest Guy on the card-style coin bar (option C, 2026-10-21)
+		if coinsFrame and FontDrop then
+			FontDrop.watch(coinsFrame)
+		end
 		local amount = coinsFrame and coinsFrame:FindFirstChild("Amount", true)
 		amountLabel = if amount and amount:IsA("TextLabel") then amount else nil
 		local coinIcon = coinsFrame and coinsFrame:FindFirstChild("CoinIcon", true)

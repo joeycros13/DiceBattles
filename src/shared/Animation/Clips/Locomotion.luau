@@ -19,6 +19,10 @@
 --   animator:Play(Locomotion.clip, { params = { model = character } })
 --   params.forceGround = true  for display copies that have no floor (idles)
 --   params.speed = 24          to fake a ground speed (previews, mannequins)
+--   params.onStep = fn(foot, sprint)  called as each foot lands while walking or
+--                              running on the ground (foot 1 / 2, sprint 0..1), at
+--                              the stride's own timing, so footstep sounds follow
+--                              the legs at any speed (PlayerAnimator, 2026-10-21)
 --
 -- ==================== tuning ====================
 -- Every value lives in Locomotion.IDLE / WALK / SPRINT. Degrees for angles,
@@ -47,6 +51,7 @@ local Locomotion = {}
 Locomotion.BLEND_RATE = 7 -- how fast idle / walk / sprint ease into each other (1/sec)
 Locomotion.GROUND_RATE = 10 -- how fast the whole pose fades on leaving / touching the ground
 Locomotion.STRIDE_LENGTH = 9 -- studs travelled per full stride cycle (two steps)
+local FOOTFALLS = { math.pi / 2, math.pi * 1.5 } -- stride phases where each foot lands
 Locomotion.TURN_LEAN = 0.06 -- degrees of roll per degree/sec of turning
 Locomotion.TURN_LEAN_MAX = 8
 
@@ -256,7 +261,18 @@ local function evaluate(track: any, out: { [string]: CFrame }, dt: number): numb
 	local k = math.min(1, dt * Locomotion.BLEND_RATE)
 	s.moving += (math.clamp(speed / (walkSpeed * 0.5), 0, 1) - s.moving) * k
 	s.sprint += (math.clamp((speed - walkSpeed * 1.1) / (walkSpeed * 0.3), 0, 1) - s.sprint) * k
+	local before = s.phase
 	s.phase = (s.phase + dt * speed / Locomotion.STRIDE_LENGTH * math.pi * 2) % (math.pi * 2)
+	-- A foot lands where the stride's bob is lowest (the legs furthest apart): phase
+	-- pi/2 and 3pi/2. Report each one passed this frame.
+	if s.onStep and not s.forceGround and s.ground > 0.9 and s.moving > 0.5 then
+		for foot, at in FOOTFALLS do
+			local crossed = if s.phase >= before then (before < at and at <= s.phase) else (at > before or at <= s.phase)
+			if crossed then
+				s.onStep(foot, s.sprint)
+			end
+		end
+	end
 
 	-- Lean into turns: roll toward the inside, from how fast the heading changes.
 	local look = root.CFrame.LookVector

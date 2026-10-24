@@ -15,15 +15,21 @@
 --   Verb        the words before {braces} in the step's `track` ("DEFEAT")
 --   Target      the part in braces, in red ("Angry Chickens")
 --   Count       "3 / 5", or the line's returnNote once done
+--               A gather / bring step's tool phase (Quests.toolNeeded, 2026-10-21)
+--               shows "BUY A Wooden Axe" / "UPGRADE TO A Stone Axe", the tool's
+--               icon and "at the Weaponsmith" until the tool is owned
 --   Chips       a "bring" step with several materials (2026-10-19, option A on the
 --               Quest Tracker Materials canvas): instead of Count, one clone of
 --               QuestTracker/Templates/MaterialChip per item (Icon, Count "5/8" in
 --               its Format), coloured from its ShortFill / ShortText / DoneFill /
 --               DoneText attributes; the badge shows the first item still short
+--   Reward      the gold tab under the card: Caption, Coins / Exp (Icon, Amount) and
+--               Item (Icon: the quest item or weapon), what this step pays
 --   Guide       turns the guide arrow on / off (GuideController); shown only
 --               when there is somewhere to point. While held down it sits
 --               pressed into its lip (GuideLip) and darkens by PressDarken,
---               and only flips on release. IconShadow is the icon's shadow.
+--               and only flips on release. IconShadow is the icon's shadow. Its
+--               Icon shows the drawn map pin from IconOn / IconOff (option C)
 --
 -- Coin and level progress follow the HUD, not the server: the server adds
 -- coins and EXP the moment an enemy dies, but the counters wait for the coins
@@ -52,6 +58,7 @@ local Config = Shared:WaitForChild("Config")
 local Enemies = require(Config:WaitForChild("Enemies"))
 local Materials = require(Config:WaitForChild("Materials"))
 local Quests = require(Config:WaitForChild("Quests"))
+local Weapons = require(Config:WaitForChild("Weapons"))
 
 local Format = require(script.Parent.Parent:WaitForChild("Util"):WaitForChild("Format"))
 
@@ -156,7 +163,15 @@ local function refreshGuide()
 	button.BackgroundColor3 = pick(if on then "OnColor" else "OffColor", Color3.new(1, 1, 1)):Lerp(Color3.new(0, 0, 0), shade)
 	local icon = button:FindFirstChild("Icon")
 	if icon and icon:IsA("ImageLabel") then
-		icon.ImageColor3 = pick(if on then "OnIconColor" else "OffIconColor", Color3.new(1, 1, 1)):Lerp(Color3.new(0, 0, 0), shade)
+		-- A drawn icon per state (IconOn / IconOff, the map pin of option C, 2026-10-21)
+		-- keeps its own colours; a plain one is tinted by OnIconColor / OffIconColor.
+		local image = button:GetAttribute(if on then "IconOn" else "IconOff")
+		if type(image) == "string" and image ~= "" then
+			icon.Image = image
+			icon.ImageColor3 = Color3.new(1, 1, 1):Lerp(Color3.new(0, 0, 0), shade)
+		else
+			icon.ImageColor3 = pick(if on then "OnIconColor" else "OffIconColor", Color3.new(1, 1, 1)):Lerp(Color3.new(0, 0, 0), shade)
+		end
 	end
 	local shadow = button:FindFirstChild("IconShadow")
 	if shadow and shadow:IsA("ImageLabel") then
@@ -190,6 +205,47 @@ local function displayedProgress(stepIndex: number, step: Quests.Step, state: st
 end
 
 local lastKey: string? = nil
+
+-- The gold Reward tab under the card (option B on the Quest Guide canvas, 2026-10-21):
+-- what handing this step in pays. Coins / Exp show their amounts; Item shows the quest
+-- item's or weapon's icon. Pieces the step doesn't give are hidden.
+local function renderReward(frame: Frame, step: Quests.Step)
+	local tab = frame:FindFirstChild("Reward")
+	if not (tab and tab:IsA("GuiObject")) then
+		return
+	end
+	local reward = step.reward or {}
+	local function show(name: string, amount: number?)
+		local piece = tab:FindFirstChild(name)
+		if not (piece and piece:IsA("GuiObject")) then
+			return
+		end
+		piece.Visible = amount ~= nil and amount > 0
+		local label = piece:FindFirstChild("Amount")
+		if label and label:IsA("TextLabel") and amount then
+			label.Text = if name == "Coins" then Format.coins(amount) else Format.commas(amount)
+		end
+	end
+	show("Coins", reward.coins)
+	show("Exp", reward.exp)
+	local icon: string? = nil
+	if reward.weapon then
+		local def = Weapons.get(reward.weapon)
+		icon = def and def.icon
+	elseif reward.item then
+		local def = Materials.get(reward.item)
+		icon = def and def.icon
+	end
+	local item = tab:FindFirstChild("Item")
+	if item and item:IsA("GuiObject") then
+		item.Visible = icon ~= nil
+		local image = item:FindFirstChild("Icon")
+		if image and image:IsA("ImageLabel") then
+			image.Image = icon or ""
+		end
+	end
+	tab.Visible = (reward.coins or 0) > 0 or (reward.exp or 0) > 0 or icon ~= nil
+end
 
 -- One chip per material of a "bring" step: its icon and "held/needed", green once met.
 local function renderChips(chips: Instance, items: { { id: string, count: number } })
@@ -301,7 +357,14 @@ local function render()
 			d.ImageColor3 = if d.Name == "Track" then colour(if ready then "TrackReady" else "TrackColor", Color3.new(1, 1, 1)) else fillColour
 		end
 	end
-	local fraction = if ready then 1 else have / goal
+	renderReward(frame, step)
+
+	-- the tool phase (Quests.toolNeeded): get the tool first, then gather
+	local tool = if ready then nil else Quests.toolNeeded(step, player)
+	if tool then
+		portrait.Image = tool.icon or ""
+	end
+	local fraction = if ready then 1 elseif tool then 0 else have / goal
 	if ringTween then
 		ringTween:Cancel()
 	end
@@ -311,7 +374,12 @@ local function render()
 	tween:Play()
 
 	-- text
-	local verb, name = split(if ready then line.returnTrack else step.track)
+	local trackLine = if ready then line.returnTrack else step.track
+	if tool then
+		local upgrade = tool.recipe ~= nil and tool.recipe.tool ~= nil
+		trackLine = (if upgrade then Quests.ToolText.upgrade else Quests.ToolText.buy):format(tool.name)
+	end
+	local verb, name = split(trackLine)
 	local verbLabel = frame:FindFirstChild("Verb") :: TextLabel
 	verbLabel.Text = verb
 	verbLabel.TextColor3 = rim
@@ -319,7 +387,7 @@ local function render()
 	targetLabel.Text = name
 	local countLabel = frame:FindFirstChild("Count") :: TextLabel
 	local chips = frame:FindFirstChild("Chips")
-	local byItem = not ready and step.kind == "bring" and chips ~= nil and #(step.items or {}) > 1
+	local byItem = not ready and not tool and step.kind == "bring" and chips ~= nil and #(step.items or {}) > 1
 	countLabel.Visible = not byItem
 	if chips and chips:IsA("GuiObject") then
 		chips.Visible = byItem
@@ -327,6 +395,8 @@ local function render()
 	end
 	if ready then
 		countLabel.Text = line.returnNote
+	elseif tool then
+		countLabel.Text = Quests.ToolText.note
 	else
 		countLabel.Text = ('%s <font color="#6b8f97">/ %s</font>'):format(Format.commas(have), Format.commas(goal))
 	end
@@ -371,12 +441,26 @@ function QuestTrackerUI.start()
 	player:GetAttributeChangedSignal("CurrentWorld"):Connect(refresh)
 	-- a bring step's chips and badge follow the materials held
 	player:GetAttributeChangedSignal("Materials"):Connect(refresh)
+	-- a gather step's tool phase ends when the tool arrives
+	player:GetAttributeChangedSignal("OwnedTools"):Connect(refresh)
 	local guide = frame:FindFirstChild("Guide")
 	if guide and guide:IsA("GuiButton") then
 		-- Held down, the button sits on its lip; it flips on release.
 		local rest = guide.Position
 		local lip = frame:FindFirstChild("GuideLip")
-		local pressedAt = if lip and lip:IsA("GuiObject") then lip.Position else rest
+		-- The lip's spot measured at the button's own anchor: the button grows from its
+		-- centre (ButtonFx) while the lip is anchored top-left, and using the lip's
+		-- Position as-is threw the held button up and left (2026-10-21).
+		local pressedAt = rest
+		if lip and lip:IsA("GuiObject") then
+			local d = guide.AnchorPoint - lip.AnchorPoint
+			pressedAt = UDim2.new(
+				lip.Position.X.Scale + lip.Size.X.Scale * d.X,
+				lip.Position.X.Offset + lip.Size.X.Offset * d.X,
+				lip.Position.Y.Scale + lip.Size.Y.Scale * d.Y,
+				lip.Position.Y.Offset + lip.Size.Y.Offset * d.Y
+			)
+		end
 		local function setPressed(down: boolean)
 			guidePressed = down
 			guide.Position = if down then pressedAt else rest

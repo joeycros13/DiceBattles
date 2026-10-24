@@ -8,6 +8,8 @@
 --   EquippedArmor  the worn set's id, or "" for none
 --   ArmorDefense   0..1 off every enemy hit (MeleeService reads it)
 --   ArmorHealth    extra max HP (ExpService.maxHealth adds it)
+--   ArmorRegen     extra share of max HP healed a second (UpgradeService's regen tick)
+--   ArmorSpeed     extra walk / sprint speed, a share (SprintController)
 -- Remotes.EquipArmor(id) wears an owned set; nil (or the worn one's id) takes
 -- it off. Crafting a set puts it on straight away.
 --
@@ -110,6 +112,8 @@ local function publish(player: Player, state: State)
 	player:SetAttribute("EquippedArmor", if def then def.id else "")
 	player:SetAttribute("ArmorDefense", if def then def.defense else 0)
 	player:SetAttribute("ArmorHealth", if def then def.health else 0)
+	player:SetAttribute("ArmorRegen", if def then def.regen or 0 else 0)
+	player:SetAttribute("ArmorSpeed", if def then def.speed or 0 else 0)
 	-- the bonus HP follows at once (a gain is usable straight away)
 	deps.Services.ExpService.applyHealth(player)
 	local character = player.Character

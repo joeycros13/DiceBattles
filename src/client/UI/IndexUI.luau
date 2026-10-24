@@ -38,12 +38,15 @@
 --       question mark), then the crafting materials it drops, and its Stats row
 --       (coins, EXP);
 --     - an armour set (2026-10-13): its rarity tile (PortraitTile), "Rare ·
---       Crafted", Defense / Health (ArmorStats), the level and coins it takes
+--       Crafted", Defense / Health (ArmorStats; a second row with RegenStat / SpeedStat
+--       only for the bonuses the set has, 2026-10-22), the level and coins it takes
 --       (ArmorCost) and its Recipe: each material with the creature that drops
 --       it and how often, or the quest that gives it. DropsTitle and RowsClip
---       move to their Armor* positions (attributes) to make room.
---     - a weapon (2026-10-13): its rarity tile, "Epic · Found", Damage / Reach
---       (WeaponStats), its Weaponsmith price if the stall sells it (WeaponCost)
+--       move to their Armor* positions (attributes) to make room; a second stats row
+--       moves them (and the cost rows) down by the stats frame's ExtraRow.
+--     - a weapon (2026-10-13): its rarity tile, "Epic · Found", its four stats in two
+--       rows (WeaponStats: DpsStat, DamageStat / ReachStat, SpeedStat), its Weaponsmith
+--       price if the stall sells it (WeaponCost)
 --       and "Found in": each enemy that drops it with this player's chance, and
 --       any quest that gives it.
 --     Clicking the same photo again closes it. The book sits in the middle of
@@ -72,10 +75,13 @@ local Tools = require(Config:WaitForChild("Tools"))
 local Potions = require(Config:WaitForChild("Potions"))
 local Fishing = require(Config:WaitForChild("Fishing"))
 local Gathering = require(Config:WaitForChild("Gathering"))
+local Infuse = require(Config:WaitForChild("Infuse"))
+local Bonuses = require(Config:WaitForChild("Bonuses"))
 
 local Util = script.Parent.Parent:WaitForChild("Util")
 local WeaponTile = require(Util:WaitForChild("WeaponTile"))
 local Format = require(Util:WaitForChild("Format"))
+local FontDrop = require(Util:WaitForChild("FontDrop"))
 
 local IndexUI = {}
 
@@ -242,8 +248,8 @@ end
 -- A drop chance with this player's luck applied (LuckBoost: passes and timed
 -- boosts multiply together, ShopService), capped at 100% like the server's roll.
 function IndexUI.luckyChance(chance: number): number
-	local luck = Players.LocalPlayer:GetAttribute("LuckBoost")
-	luck = (if type(luck) == "number" and luck > 0 then luck else 1) * Upgrades.value(Players.LocalPlayer, "Luck")
+	-- passes, boosts and the Luck upgrade, added (Config/Bonuses)
+	local luck = Bonuses.luck(Players.LocalPlayer)
 	return math.min(1, chance * luck)
 end
 local luckyChance = IndexUI.luckyChance
@@ -300,6 +306,32 @@ local function slipMode(slip: Instance, kind: string, room: boolean)
 		title.Text = attribute(title, kind .. "Text", title.Text)
 	end
 	place(slip:FindFirstChild("RowsClip"), spot)
+	place(slip:FindFirstChild("ArmorCost"), "Armor")
+	place(slip:FindFirstChild("WeaponCost"), "Armor")
+end
+
+-- A slip whose stats take a second row (a weapon's four stats; an armour set with regen
+-- or speed, 2026-10-22): everything under the stats moves down by the stats frame's
+-- ExtraRow attribute (slip scale) and the list gives up that height. Run after slipMode.
+local function lowerForStats(slip: Instance, stats: Instance?)
+	local extra = stats and stats:GetAttribute("ExtraRow")
+	if type(extra) ~= "number" then
+		return
+	end
+	for _, name in { "DropsTitle", "RowsClip", "ArmorCost", "WeaponCost" } do
+		local piece = slip:FindFirstChild(name)
+		if piece and piece:IsA("GuiObject") then
+			piece.Position += UDim2.fromScale(0, extra)
+			if name == "RowsClip" then
+				piece.Size -= UDim2.fromScale(0, extra)
+			end
+		end
+	end
+end
+
+-- "0.25", "5": a share as a percentage without trailing zeros
+local function percentText(share: number): string
+	return (("%.2f"):format(share * 100):gsub("0+$", ""):gsub("%.$", ""))
 end
 
 -- The slip's picture for a weapon or armour set: its icon on its rarity tile.
@@ -479,6 +511,25 @@ local function renderArmorSlip(slip: Instance, def: Armor.ArmorDef)
 		if health then
 			setText(health, "Value", (attribute(stats, "HealthFormat", "+%d") :: string):format(def.health))
 		end
+		-- the second row: only the bonuses the set has, packed to the left
+		local regen, speed = def.regen or 0, def.speed or 0
+		local regenStat = stats:FindFirstChild("RegenStat")
+		local speedStat = stats:FindFirstChild("SpeedStat")
+		local left = stats:FindFirstChild("DefenseStat")
+		local right = stats:FindFirstChild("HealthStat")
+		if regenStat and regenStat:IsA("GuiObject") then
+			regenStat.Visible = regen > 0
+			setText(regenStat, "Value", (attribute(stats, "RegenFormat", "+%s%%/s") :: string):format(percentText(regen)))
+		end
+		if speedStat and speedStat:IsA("GuiObject") and left and right and left:IsA("GuiObject") and right:IsA("GuiObject") then
+			speedStat.Visible = speed > 0
+			setText(speedStat, "Value", (attribute(stats, "SpeedFormat", "+%s%%") :: string):format(percentText(speed)))
+			local column = if regen > 0 then right else left
+			speedStat.Position = UDim2.new(column.Position.X, speedStat.Position.Y)
+		end
+		if regen > 0 or speed > 0 then
+			lowerForStats(slip, stats)
+		end
 	end
 	local cost = slip:FindFirstChild("ArmorCost")
 	if cost then
@@ -524,16 +575,28 @@ local function renderWeaponSlip(slip: Instance, def: any)
 	tilePicture(slip, rarity, def.icon)
 	setText(slip, "EnemyName", def.name)
 	rarityLine(slip, rarity, "WeaponFormat")
+	-- four stats in two rows (2026-10-22, like the Inventory's weapon card): DPS and Damage,
+	-- then Reach and the seconds a swing takes, after the Worldheart Blade's tier (Infuse.adjust)
 	local stats = slip:FindFirstChild("WeaponStats")
 	if stats then
+		local swing = Infuse.adjust(Players.LocalPlayer, def)
+		local dps = stats:FindFirstChild("DpsStat")
+		if dps then
+			setText(dps, "Value", (attribute(stats, "DpsFormat", "%s DPS") :: string):format(WeaponTile.dpsNumber(def, true)))
+		end
 		local damage = stats:FindFirstChild("DamageStat")
 		if damage then
-			setText(damage, "Value", (attribute(stats, "DamageFormat", "%d") :: string):format(def.damage or 0))
+			setText(damage, "Value", (attribute(stats, "DamageFormat", "%d") :: string):format(math.floor((swing.damage or 0) + 0.5)))
 		end
 		local reach = stats:FindFirstChild("ReachStat")
 		if reach then
-			setText(reach, "Value", (attribute(stats, "ReachFormat", "%s") :: string):format(tostring(def.reach or 0)))
+			setText(reach, "Value", (attribute(stats, "ReachFormat", "%s") :: string):format((("%.1f"):format(swing.reach or 0):gsub("%.0$", ""))))
 		end
+		local speed = stats:FindFirstChild("SpeedStat")
+		if speed then
+			setText(speed, "Value", (attribute(stats, "SpeedFormat", "%s s") :: string):format((("%.2f"):format(swing.cooldown or 0):gsub("0$", ""))))
+		end
+		lowerForStats(slip, stats)
 	end
 	local cost = slip:FindFirstChild("WeaponCost")
 	local coins = cost and cost:FindFirstChild("CoinStat")
@@ -1046,7 +1109,13 @@ render = function()
 	local fill = find("ProgressBar")
 	fill = fill and fill:FindFirstChild("Fill")
 	if fill and fill:IsA("GuiObject") then
-		fill.Size = UDim2.fromScale(if total > 0 then found / total else 0, 1)
+		-- never narrower than it is tall: the fill is rounded at both ends, so a sliver
+		-- squashed into a lopsided blob at a low count (2026-10-21, the user); now a
+		-- little progress shows as a round dot that grows into the bar
+		local bar = fill.Parent :: GuiObject
+		local least = if bar.AbsoluteSize.X > 0 then bar.AbsoluteSize.Y / bar.AbsoluteSize.X else 0
+		local share = if total > 0 then found / total else 0
+		fill.Size = UDim2.fromScale(if share > 0 then math.max(share, least) else 0, 1)
 		fill.Visible = found > 0
 	end
 	local world = filter and Worlds.get(filter)
@@ -1119,6 +1188,10 @@ local function wirePanel(gui: ScreenGui)
 		end)
 	end
 	local bar = find("Tabs")
+	-- the tab names (Luckiest Guy) sit centred on each pill's face (2026-10-22: they drew high)
+	if bar then
+		FontDrop.watch(bar)
+	end
 	for _, button in (if bar then bar:GetChildren() else {}) :: { Instance } do
 		local name = button:GetAttribute("Tab")
 		if button:IsA("GuiButton") and type(name) == "string" then

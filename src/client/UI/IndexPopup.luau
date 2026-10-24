@@ -39,6 +39,7 @@
 --     TitleNewText for the tag ("NEW TITLE!") and the TitleSubtitle line.
 
 local Players = game:GetService("Players")
+local UiSound = require(script.Parent.Parent:WaitForChild("Util"):WaitForChild("UiSound"))
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
@@ -282,6 +283,7 @@ local function playNext()
 		playNext()
 		return
 	end
+	UiSound.play("NewItem")
 	local p = pop :: any
 	local tweens: { Tween } = {}
 	local function keep(tween: Tween?)

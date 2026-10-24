@@ -1,0 +1,112 @@
+"""Leaderboard reward art (2026-10-22, the user's picks on the "Leaderboard rewards" canvas,
+https://claude.ai/artifact/Sjkt4yWCvqYH2dWYRot9Vg): medal A (a round medal on a ribbon with a
+star) in gold / silver / bronze for the overhead badge and the player-list chip, a trophy cup in
+the same three for the Ranks panel's Trophies view, and the #1 trail sprites. Drawn in the
+upgrade icons' "puffy toy" style: 128-unit viewBox, ink 2b1b3d strokes, flat fills with a white
+gloss, a sparkle.
+
+    python leader_icons.py          # writes leader_icons.dc.html (data-export names)
+    python ../ui/svg_render.py leader_icons.dc.html <out_dir>
+
+Trail sprites: Coin (gold, used as drawn), Star and Spark (white fills with ink outlines, so a
+ParticleEmitter's Color tints the fill and the ink stays dark), Twinkle (plain white).
+"""
+import os
+
+INK = "#2b1b3d"
+TIERS = {
+    "Gold": {"face": "#ffd23f", "rim": "#c98a0b", "deep": "#a8730a", "ribbon": "#e8574a", "ribbonDark": "#b8342c"},
+    "Silver": {"face": "#e4ebf2", "rim": "#8f9cad", "deep": "#6f7c8e", "ribbon": "#3f8ae8", "ribbonDark": "#2558b8"},
+    "Bronze": {"face": "#eaa46a", "rim": "#9c5a26", "deep": "#7a4219", "ribbon": "#3fa34d", "ribbonDark": "#2c7a38"},
+}
+STAR = "M64 36 L69.9 51.5 L86.5 52.6 L73.8 63.2 L77.8 79.4 L64 70.5 L50.2 79.4 L54.2 63.2 L41.5 52.6 L58.1 51.5 Z"
+SPARKLE = ('<path d="M104.0 12.0 L106.1 18.9 L113.0 21.0 L106.1 23.1 L104.0 30.0 L101.9 23.1 '
+           'L95.0 21.0 L101.9 18.9 Z" fill="#ffffff" stroke="#2b1b3d" stroke-width="2"></path>')
+
+
+def medal(t):
+    c = TIERS[t]
+    return f"""<path d="M44 74 L30 120 L46 110 L56 124 L64 84 Z" fill="{c['ribbon']}" stroke="{INK}" stroke-width="6" stroke-linejoin="round"></path>
+<path d="M84 74 L98 120 L82 110 L72 124 L64 84 Z" fill="{c['ribbon']}" stroke="{INK}" stroke-width="6" stroke-linejoin="round"></path>
+<path d="M50 98 L46 110 L56 124 L58 104 Z" fill="{c['ribbonDark']}" opacity="0.55"></path>
+<circle cx="64" cy="56" r="46" fill="{c['rim']}" stroke="{INK}" stroke-width="7"></circle>
+<circle cx="64" cy="56" r="34" fill="{c['face']}" stroke="{c['deep']}" stroke-width="4"></circle>
+<path d="{STAR}" fill="#ffffff" stroke="{INK}" stroke-width="4.5" stroke-linejoin="round"></path>
+<ellipse cx="46" cy="34" rx="10" ry="5" fill="#ffffff" opacity="0.75" transform="rotate(-35 46 34)"></ellipse>
+{SPARKLE}"""
+
+
+def cup(t):
+    c = TIERS[t]
+    return f"""<ellipse cx="64" cy="118" rx="36" ry="5" fill="#000000" opacity="0.18"></ellipse>
+<path d="M34 34 C10 34 12 70 40 66 M94 34 C118 34 116 70 88 66" fill="none" stroke="{INK}" stroke-width="13" stroke-linecap="round"></path>
+<path d="M34 34 C10 34 12 70 40 66 M94 34 C118 34 116 70 88 66" fill="none" stroke="{c['rim']}" stroke-width="5" stroke-linecap="round"></path>
+<path d="M32 18 H96 V44 C96 68 82 80 64 80 C46 80 32 68 32 44 Z" fill="{c['face']}" stroke="{INK}" stroke-width="7" stroke-linejoin="round"></path>
+<path d="M64 30 L67.6 39.4 L77.7 40.1 L70 46.5 L72.4 56.4 L64 51 L55.6 56.4 L58 46.5 L50.3 40.1 L60.4 39.4 Z" fill="#ffffff" stroke="{INK}" stroke-width="3.5" stroke-linejoin="round"></path>
+<rect x="56" y="78" width="16" height="18" fill="{c['rim']}" stroke="{INK}" stroke-width="6"></rect>
+<rect x="36" y="94" width="56" height="20" rx="6" fill="{c['face']}" stroke="{INK}" stroke-width="7"></rect>
+<rect x="46" y="100" width="36" height="8" rx="3" fill="{c['rim']}"></rect>
+<ellipse cx="46" cy="30" rx="7" ry="3.5" fill="#ffffff" opacity="0.8" transform="rotate(-20 46 30)"></ellipse>
+{SPARKLE}"""
+
+
+def coin():
+    return f"""<circle cx="64" cy="64" r="52" fill="#ffd23f" stroke="{INK}" stroke-width="10"></circle>
+<circle cx="64" cy="64" r="33" fill="none" stroke="#c98a0b" stroke-width="8"></circle>
+<ellipse cx="44" cy="40" rx="11" ry="6" fill="#ffffff" opacity="0.8" transform="rotate(-35 44 40)"></ellipse>"""
+
+
+def star():
+    return f"""<path d="M64 8 L79 46 L120 48 L88 74 L99 116 L64 92 L29 116 L40 74 L8 48 L49 46 Z" fill="#ffffff" stroke="{INK}" stroke-width="10" stroke-linejoin="round"></path>"""
+
+
+def spark():
+    return f"""<path d="M64 6 L76 52 L122 64 L76 76 L64 122 L52 76 L6 64 L52 52 Z" fill="#ffffff" stroke="{INK}" stroke-width="10" stroke-linejoin="round"></path>"""
+
+
+def twinkle():
+    return """<path d="M64 10 L72 56 L118 64 L72 72 L64 118 L56 72 L10 64 L56 56 Z" fill="#ffffff"></path>"""
+
+
+DRAFTS = [("Medal" + t, "Medal " + t, (lambda t=t: medal(t))) for t in TIERS] + \
+    [("Cup" + t, "Cup " + t, (lambda t=t: cup(t))) for t in TIERS] + \
+    [("TrailCoin", "Trail coin", coin), ("TrailStar", "Trail star", star),
+     ("TrailSpark", "Trail spark", spark), ("TrailTwinkle", "Trail twinkle", twinkle)]
+
+
+def artboard():
+    cells = []
+    for export, label, fn in DRAFTS:
+        cells.append(f"""<div style="background: #fff8ec; border: 4px solid #2b1b3d; border-radius: 22px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px">
+<svg data-export="{export}" role="img" aria-label="{label}" viewBox="0 0 128 128" style="width: 128px; height: 128px">
+{fn()}
+</svg>
+<span style="font-size: 16px">{label}</span>
+</div>""")
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Leaderboard reward art</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&amp;display=swap" rel="stylesheet">
+<style>body{{margin:0}}</style>
+</helmet>
+<div style="width: 1000px; box-sizing: border-box; padding: 24px; background: #8fb7bf; font-family: 'Luckiest Guy', sans-serif; color: #2b1b3d; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px">
+{chr(10).join(cells)}
+</div>
+</x-dc>
+</body>
+</html>
+"""
+
+
+if __name__ == "__main__":
+    here = os.path.dirname(os.path.abspath(__file__))
+    with open(os.path.join(here, "leader_icons.dc.html"), "w", encoding="utf-8", newline="\n") as f:
+        f.write(artboard())
+    print("wrote leader_icons.dc.html")

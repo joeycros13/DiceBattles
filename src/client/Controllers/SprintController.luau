@@ -9,9 +9,11 @@
 -- this only adds a small camera FOV push, as an Animation.CameraFX zoom layer
 -- ("Sprint") that eases in and out.
 --
--- A Swiftness potion (Config/Potions, 2026-10-19) multiplies both walking and
--- sprinting, so the walk speed is set every step from StarterPlayer's
--- CharacterWalkSpeed x the potion x the sprint multiplier.
+-- A Swiftness potion (Config/Potions, 2026-10-19) and the worn armour's speed bonus
+-- (Config/Armor, the player's ArmorSpeed attribute, 2026-10-22) speed up both walking and
+-- sprinting, together never past + Armor.MAX_SPEED, and the Sprint upgrade's share adds on
+-- while sprinting (they add, 2026-10-23: Config/Bonuses.speed), so the walk speed is set
+-- every step from StarterPlayer's CharacterWalkSpeed x that total.
 
 local Players = game:GetService("Players")
 local StarterPlayer = game:GetService("StarterPlayer")
@@ -21,7 +23,8 @@ local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Upgrades = require(Shared:WaitForChild("Config"):WaitForChild("Upgrades"))
-local Potions = require(Shared:WaitForChild("Config"):WaitForChild("Potions"))
+local Settings = require(Shared:WaitForChild("Config"):WaitForChild("Settings"))
+local Bonuses = require(Shared:WaitForChild("Config"):WaitForChild("Bonuses"))
 local CameraFX = require(Shared:WaitForChild("Animation")).CameraFX
 
 local SprintController = {}
@@ -59,15 +62,16 @@ local function step(dt: number)
 
 	if want ~= sprinting then
 		sprinting = want
-		if sprinting then
+		-- the FOV push is the player's "Sprint zoom" setting (Config/Settings)
+		if sprinting and Settings.on(player, "SprintZoom") then
 			CameraFX.zoom("Sprint", FOV_PUSH, FOV_SPEED)
 		else
 			CameraFX.release("Sprint")
 		end
 	end
-	local speed = StarterPlayer.CharacterWalkSpeed
-		* Potions.multiplier(player, "Swiftness")
-		* (if sprinting then Upgrades.value(player, "Sprint") else 1)
+	-- a Swiftness potion, the worn armour's speed (their sum capped) and the Sprint
+	-- upgrade while sprinting, added (Config/Bonuses.speed)
+	local speed = StarterPlayer.CharacterWalkSpeed * Bonuses.speed(player, sprinting)
 	if math.abs(humanoid.WalkSpeed - speed) > 0.01 then
 		humanoid.WalkSpeed = speed
 	end

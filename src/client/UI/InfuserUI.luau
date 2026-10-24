@@ -17,6 +17,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local UiSound = require(script.Parent.Parent:WaitForChild("Util"):WaitForChild("UiSound"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = Shared:WaitForChild("Config")
@@ -221,6 +222,7 @@ local function onInfuse()
 	if ok then
 		PanelWindow.hidePanel()
 	elseif gui then
+		UiSound.play("Refuse")
 		local line = (gui:FindFirstChild("Window") :: any).Inner.Right.Line
 		line.TextColor3 = ERROR_TEXT
 		line.Text = REASONS[reason] or "The altar does not answer."

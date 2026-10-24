@@ -51,13 +51,19 @@ PLAYER = {
     "detour": 1.3,           # walking routes vs a straight line (paths, hills, fences)
     "sprint": False,         # no base sprint since 2026-10-19 (an upgrade, outside the run)
     "hitRate": 0.85,         # share of swings that land (misses, enemies wandering)
+    "critChance": 0.10,      # Balance.Melee.critChance: a landed hit is a crit this often
+    "critMultiplier": 1.5,   # Balance.Melee.critMultiplier: and deals this times its damage
     "engageSeconds": 1.0,    # lining up the first swing once in range
     "talkSeconds": 15,       # one Dale visit: hand in, read, take the next step
     "shopSeconds": 8,        # one visit to a stall (open, pick, buy)
     "regen": 0.01,           # Roblox's default Health script: 1% of max HP per second
-    "restBelow": 1.0,        # rest before a fight that would take more than this share of HP
+    "restMargin": 1.5,       # rest before a fight until HP is this times what it should take (fights vary:
+                             # since 2026-10-24 a small enemy takes ~50%, two or three hits, so a real
+                             # player tops up first; 1.1 until then, when deaths were rare anyway)
     "replanEvery": 4,        # kills between rethinking what to farm
-    "tooStrong": 0.9,        # skip a fight that would take this share of max HP: get stronger first
+    "closeEnough": 0.10,     # activities paying within this share of the best are equal: the nearest wins
+    "tooStrong": 0.7,        # skip a fight that would take this share of max HP: get stronger first
+                             # (0.9 until 2026-10-24; with ~50% small-enemy fights a player backs off sooner)
 }
 
 
@@ -127,6 +133,15 @@ class World:
         self.allWeapons = {w for w, v in self.weapons.items() if self.counts(v)}
         self.needWeapons = set(self.allWeapons) if goal == "all" else set()
         self.needTools = {t for t, v in self.tools.items() if v["kind"] in ("Axe", "Pickaxe") or (rod and v["kind"] == "Rod")}
+        # A tool made from the one before it (World 2's stone tools, 2026-10-20) also needs
+        # materials. Only this world's count: the older tool and the older world's gathered
+        # materials are carried in from the last world.
+        here = {x["id"] for e in self.enemies.values() for x in e["materials"]}
+        here |= {x["id"] for g in self.gather.values() for x in g["drops"]}
+        self.toolRecipe = {}
+        for t, v in self.tools.items():
+            r = (v.get("recipe") or {}).get("materials") or {}
+            self.toolRecipe[t] = [x for x in listify(r) if x["id"] in here]
 
     def secret_weapon(self, wid):
         w = self.d["weapons"].get(wid, {})
@@ -137,35 +152,67 @@ class World:
         return not w.get("starter") and not w.get("carried") and not self.secret_weapon(w["id"])
 
     # level curve
+    def scale_at(self, level):
+        """Leveling.scaleAt: the world scale from each gate's level on (2026-10-23)."""
+        m = 1
+        for at, mult in self.lv.get("scale", []):
+            if level >= at:
+                m = mult
+        return m
+
+    def need(self, level):
+        if self.lv.get("growth"):
+            # Leveling since 2026-10-24: x10 every 25 levels (a world), each level a share more
+            return math.floor(self.lv["first"] * self.lv["growth"] ** (level - self.lv["start"]) + 0.5)
+        return (self.lv["first"] + self.lv["step"] * (level - self.lv["start"])) * self.scale_at(level)
+
     def level_of(self, total):
         level, left = self.lv["start"], total
-        while left >= self.lv["first"] + self.lv["step"] * (level - self.lv["start"]):
-            left -= self.lv["first"] + self.lv["step"] * (level - self.lv["start"])
+        while left >= self.need(level):
+            left -= self.need(level)
             level += 1
         return level
 
     def exp_for(self, level):
-        return sum(self.lv["first"] + self.lv["step"] * (l - self.lv["start"]) for l in range(self.lv["start"], level))
+        return sum(self.need(l) for l in range(self.lv["start"], level))
 
     def max_hp(self, level, armor):
-        return self.lv["baseHealth"] + self.lv["healthPerLevel"] * (level - self.lv["start"]) + (self.armor[armor]["health"] if armor else 0)
+        if self.lv.get("growth"):
+            base = math.floor(self.lv["baseHealth"] * self.lv["growth"] ** (level - self.lv["start"]) + 0.5)
+        else:
+            base = (self.lv["baseHealth"] + self.lv["healthPerLevel"] * (level - self.lv["start"])) * self.scale_at(level)
+        return base + (self.armor[armor]["health"] if armor else 0)
 
 
 # ---------------------------------------------------------------------------
 START = {}
-# upgrade levels (Health, Defense, Attack, AttackSpeed), --upgrades
-UPG = {"health": 0, "defense": 0, "attack": 0, "speed": 0}
-UPG_STEP = {"health": 0.05, "defense": -0.01, "attack": 0.03, "speed": -0.015}
+# upgrade levels, --upgrades N (every upgrade at N since 2026-10-24: the base player arrives maxed;
+# it was only Health, Defense, Attack and Attack Speed). Config/Upgrades steps a level.
+UPG = {"health": 0, "defense": 0, "attack": 0, "speed": 0, "critChance": 0, "critDamage": 0,
+       "regen": 0, "coins": 0, "exp": 0, "luck": 0, "gathering": 0, "sprint": 0}
+UPG_STEP = {"health": 0.05, "defense": -0.01, "attack": 0.03, "speed": -0.015, "critChance": 0.01, "critDamage": 0.05,
+            "regen": 0.0015, "coins": 0.04, "exp": 0.04, "luck": 0.05, "gathering": 0.01, "sprint": 0.04}
 
 
 def upg(name):
     return 1 + UPG_STEP[name] * UPG[name]
 
 
+def crit():
+    """(chance, multiplier) with the Crit upgrades."""
+    return (PLAYER["critChance"] + UPG_STEP["critChance"] * UPG["critChance"],
+            PLAYER["critMultiplier"] + UPG_STEP["critDamage"] * UPG["critDamage"])
+
+
+def lucky(chance):
+    return min(1.0, chance * upg("luck"))
+
+
 class Run:
     def __init__(self, world, rng, overrides=None, trace=False):
         self.w, self.rng, self.trace_on = world, rng, trace
         self.t = 0.0
+        self.probe = {"kill": {}, "step": {}, "wear": {}}  # levels things happen at (--probe)
         self.pos = list(world.places["spawn"])
         self.coins = 0
         self.exp = 0
@@ -208,17 +255,37 @@ class Run:
     def spend(self, what, seconds):
         self.t += seconds
         self.log[what] = self.log.get(what, 0) + seconds
+        if self.wearing:  # --probe: time worn at each level
+            h = self.probe["wear"].setdefault(self.wearing, {})
+            lv = self.level()
+            h[lv] = h.get(lv, 0) + seconds
         # regen while doing anything
-        self.hp = min(self.maxhp(), self.hp + self.maxhp() * PLAYER["regen"] * seconds)
+        self.hp = min(self.maxhp(), self.hp + self.maxhp() * self.regen() * seconds)
 
     def level(self):
         return self.w.level_of(self.exp)
+
+    def worn(self, key):
+        """An armour bonus of the set worn (Config/Armor regen / speed), 0 without one."""
+        return self.w.armor[self.wearing].get(key, 0) if self.wearing else 0
+
+    def regen(self):
+        """Share of max HP healed a second: Roblox's 1%, the set's regen, the Regen upgrade."""
+        return PLAYER["regen"] + self.worn("regen") + UPG_STEP["regen"] * UPG["regen"]
+
+    def spd(self):
+        # walk speed x (1 + armour speed), capped like Armor.MAX_SPEED (Swiftness is outside the run);
+        # with the Sprint upgrade the player sprints everywhere (Bonuses.speed adds its share)
+        boost = min(self.worn("speed"), 0.5)
+        if UPG["sprint"] > 0:
+            boost += 0.16 + UPG_STEP["sprint"] * UPG["sprint"]
+        return self.w.speed * (1 + boost)
 
     def maxhp(self):
         return self.w.max_hp(self.level(), self.wearing) * upg("health")
 
     def walk(self, to, what="walking"):
-        seconds = dist(self.pos, to) * PLAYER["detour"] / self.w.speed
+        seconds = dist(self.pos, to) * PLAYER["detour"] / self.spd()
         self.spend(what, seconds)
         self.pos = list(to)
 
@@ -254,6 +321,8 @@ class Run:
         for wid in self.weapons:
             v = self.w.weapons[wid]
             per = v["damage"] * upg("attack") * (1 - (0 if v.get("ignoreArmor") else armor))
+            chance, mult = crit()
+            per *= 1 + chance * (mult - 1)  # crits on average
             hits = math.ceil(e["hp"] / per)
             ttk = (v["hitTime"] + (hits - 1) * v["cooldown"] / PLAYER["hitRate"]) * upg("speed")
             if best is None or ttk < best[1]:
@@ -272,9 +341,10 @@ class Run:
         t = PLAYER["engageSeconds"] + v["hitTime"] * upg("speed")
         first_hit = None
         knocks = []           # times the enemy was knocked back
+        chance, mult = crit()
         while True:
             if rng.random() < PLAYER["hitRate"]:
-                hp -= per
+                hp -= per * (mult if rng.random() < chance else 1)
                 if first_hit is None:
                     first_hit = t
                 knocks.append(t)
@@ -308,9 +378,9 @@ class Run:
         target = min(markers, key=lambda m: dist(self.pos, m["pos"]))["pos"]
         best = None
         for z in self.w.healZones:
-            go = dist(self.pos, z["pos"]) * PLAYER["detour"] / self.w.speed
-            back = dist(z["pos"], target) * PLAYER["detour"] / self.w.speed
-            direct = dist(self.pos, target) * PLAYER["detour"] / self.w.speed
+            go = dist(self.pos, z["pos"]) * PLAYER["detour"] / self.spd()
+            back = dist(z["pos"], target) * PLAYER["detour"] / self.spd()
+            direct = dist(self.pos, target) * PLAYER["detour"] / self.spd()
             wait = max(0, self.zoneReady - (self.t + go))
             extra = go + wait + back - direct
             if best is None or extra < best[0]:
@@ -337,8 +407,9 @@ class Run:
         weapon = self.best_weapon(enemy)
         # resting first if this fight would kill us
         _, expect = self.fight(enemy, weapon, dry=True)
-        if expect >= self.hp * PLAYER["restBelow"] and expect < self.maxhp():
-            need = (expect * 1.1 - self.hp) / (self.maxhp() * PLAYER["regen"])
+        want = min(self.maxhp(), expect * PLAYER["restMargin"])
+        if self.hp < want and expect < self.maxhp():
+            need = (want - self.hp) / (self.maxhp() * self.regen())
             if need > 0 and not self.use_fountain(markers, need):
                 self.rests += need
                 if self.t < 600:
@@ -348,7 +419,7 @@ class Run:
         best = None
         for i, m in enumerate(markers):
             ready = self.dead.get((enemy, i), 0)
-            arrive = self.t + dist(self.pos, m["pos"]) * PLAYER["detour"] / w.speed
+            arrive = self.t + dist(self.pos, m["pos"]) * PLAYER["detour"] / self.spd()
             when = max(arrive, ready)
             if best is None or when < best[0]:
                 best = (when, i, m)
@@ -373,16 +444,22 @@ class Run:
         self.dead[(enemy, i)] = self.t + w.respawn[enemy]
         e = w.enemies[enemy]
         self.kills[enemy] = self.kills.get(enemy, 0) + 1
-        got = self.rng.randint(e["coins"]["min"], e["coins"]["max"])
+        h = self.probe["kill"].setdefault(enemy, {})
+        h[self.level()] = h.get(self.level(), 0) + 1
+        got = round(self.rng.randint(e["coins"]["min"], e["coins"]["max"]) * upg("coins"))
         self.coins += got
         if self.accepted and self.cur() and self.cur()["kind"] == "earn":
             self.progress += got
-        self.add_exp(e.get("exp", 0))
+        self.add_exp(round(e.get("exp", 0) * upg("exp")))
         for x in e["materials"]:
-            if self.rng.random() < x["chance"]:
-                self.mats[x["id"]] = self.mats.get(x["id"], 0) + self.rng.randint(x["min"], max(x["min"], x["max"]))
+            if self.rng.random() < lucky(x["chance"]):
+                n = self.rng.randint(x["min"], max(x["min"], x["max"]))
+                self.mats[x["id"]] = self.mats.get(x["id"], 0) + n
+                c = self.cur()
+                if self.accepted and c and c["kind"] == "gather" and c["target"] == x["id"]:
+                    self.progress += n
         for x in e["drops"]:
-            if x["weapon"] not in self.weapons and self.rng.random() < x["chance"]:
+            if x["weapon"] not in self.weapons and self.rng.random() < lucky(x["chance"]):
                 self.weapons.add(x["weapon"])
                 self.got[x["weapon"]] = (self.t, "dropped by " + enemy)
                 self.say("drop!", x["weapon"], "from", enemy)
@@ -401,7 +478,7 @@ class Run:
         best = None
         for i, p in enumerate(w.nodes[kind]):
             up = self.nodeDown.get((kind, i), 0)
-            arrive = self.t + dist(self.pos, p) * PLAYER["detour"] / w.speed
+            arrive = self.t + dist(self.pos, p) * PLAYER["detour"] / self.spd()
             when = max(arrive, up)
             if best is None or when < best[0]:
                 best = (when, i, p)
@@ -421,6 +498,8 @@ class Run:
         for x in g["drops"]:
             if self.rng.random() < x["chance"]:
                 n = self.rng.randint(x["min"], max(x["min"], x["max"]))
+                if self.rng.random() < UPG_STEP["gathering"] * UPG["gathering"]:
+                    n *= 2  # the Gathering upgrade doubles a drop
                 self.mats[x["id"]] = self.mats.get(x["id"], 0) + n
                 c = self.cur()
                 if self.accepted and c and c["kind"] == "gather" and c["target"] == x["id"]:
@@ -469,6 +548,8 @@ class Run:
             if c["kind"] == "give":
                 self.coins -= c.get("count", c.get("amount", 0))
             r = c.get("reward", {})
+            self.probe["step"].setdefault(str(self.step + 1), {}).setdefault(self.level(), 0)
+            self.probe["step"][str(self.step + 1)][self.level()] += 1
             self.coins += r.get("coins", 0)
             self.add_exp(r.get("exp", 0))
             if r.get("item"):
@@ -494,7 +575,14 @@ class Run:
         if not self.gateDone:
             for x in self.w.gate["materials"]:
                 need[x["id"]] = need.get(x["id"], 0) + x["count"]
+        for t in self.w.needTools - self.tools:
+            for x in self.w.toolRecipe[t]:
+                need[x["id"]] = need.get(x["id"], 0) + x["count"]
         return {k: max(0, n - self.mats.get(k, 0)) for k, n in need.items()}
+
+    def tool_ready(self, t):
+        return (self.coins >= self.w.tools[t]["price"]
+                and all(self.mats.get(x["id"], 0) >= x["count"] for x in self.w.toolRecipe[t]))
 
     def coin_need(self):
         n = sum(self.w.weapons[x].get("price", 0) for x in self.w.needWeapons - self.weapons if self.w.weapons[x].get("price"))
@@ -526,9 +614,12 @@ class Run:
         did = False
         # tools first: they're cheap and the quest needs them
         for t in sorted(w.needTools - self.tools, key=lambda t: w.tools[t]["price"]):
-            if self.coins >= w.tools[t]["price"]:
+            if self.tool_ready(t):
                 self.coins -= w.tools[t]["price"]
+                for x in w.toolRecipe[t]:
+                    self.mats[x["id"]] -= x["count"]
                 self.tools.add(t)
+                self.say("made", t)
                 did = True
         # the gate's coins come last: keep them only once everything else is bought
         missing = sorted((x for x in w.needWeapons - self.weapons if w.weapons[x].get("price")), key=lambda x: w.weapons[x]["price"])
@@ -571,7 +662,7 @@ class Run:
 
     def can_shop_something(self):
         w = self.w
-        if any(self.coins >= w.tools[t]["price"] for t in w.needTools - self.tools):
+        if any(self.tool_ready(t) for t in w.needTools - self.tools):
             return True
         if any(self.coins >= w.weapons[x]["price"] for x in w.needWeapons - self.weapons if w.weapons[x].get("price")):
             return True
@@ -593,7 +684,7 @@ class Run:
                 return None
             tv = w.tools[tool]
             n = len(w.nodes[activity])
-            per = PLAYER["engageSeconds"] + tv["hitTime"] + (math.ceil(g["hp"] / tv["power"]) - 1) * tv["cooldown"] + 25 / w.speed * PLAYER["detour"]
+            per = PLAYER["engageSeconds"] + tv["hitTime"] + (math.ceil(g["hp"] / tv["power"]) - 1) * tv["cooldown"] + 25 / self.spd() * PLAYER["detour"]
             cycle = max(per, (per * n + g["respawn"]) / n)
             out = {}
             for x in g["drops"]:
@@ -604,7 +695,7 @@ class Run:
         fight, _ = self.fight(activity, weapon, dry=True)
         n = len(w.markers[activity])
         gap = 0 if n == 1 else 45
-        per = fight + gap * PLAYER["detour"] / w.speed
+        per = fight + gap * PLAYER["detour"] / self.spd()
         cycle = max(per, (fight + w.respawn[activity]) / n)
         out = {"coins": (e["coins"]["min"] + e["coins"]["max"]) / 2 / cycle, "exp": e.get("exp", 0) / cycle}
         for x in e["materials"]:
@@ -619,7 +710,7 @@ class Run:
         needs.update(self.mat_needs())
         for x in self.drop_only_missing():
             needs["weapon:" + x] = 1
-        best = None
+        scored = []
         for act in list(self.w.enemies) + list(self.w.gather):
             if act in self.w.enemies and not self.beatable(act):
                 continue
@@ -627,9 +718,19 @@ class Run:
             if not r:
                 continue
             score = sum(r.get(k, 0) / v for k, v in needs.items() if v > 0)
-            if best is None or score > best[0]:
-                best = (score, act)
-        return best[1] if best and best[0] > 0 else None
+            if score > 0:
+                scored.append((score, act))
+        if not scored:
+            return None
+        # a real player doesn't walk across the map for a few percent more (2026-10-24): anything
+        # within PLAYER.closeEnough of the best counts, and the nearest of those wins
+        top = max(sc for sc, _ in scored)
+        near = [act for sc, act in scored if sc >= top * (1 - PLAYER["closeEnough"])]
+        return min(near, key=self.distance_to)
+
+    def distance_to(self, act):
+        spots = [m["pos"] for m in self.w.markers[act]] if act in self.w.enemies else self.w.nodes[act]
+        return min(dist(self.pos, p) for p in spots)
 
     def do(self, activity, times=1):
         for _ in range(times):
@@ -666,15 +767,11 @@ class Run:
                         continue
                     # too strong for now: level up and gear up on something else
                 if k == "gather":
-                    if not self.ensure_tool(c["target"]):
-                        continue
-                    self.do(self.node_for(c["target"]))
+                    self.farm_material(c["target"])
                     continue
                 if k == "bring":
                     short = [x for x in c["items"] if self.mats.get(x["id"], 0) < x["count"]]
-                    if not self.ensure_tool(short[0]["id"]):
-                        continue
-                    self.do(self.node_for(short[0]["id"]))
+                    self.farm_material(short[0]["id"])
                     continue
                 # level, earn, give: farm by need
             if c is None:
@@ -696,18 +793,45 @@ class Run:
         return self
 
     def node_for(self, material):
-        return next(g for g, v in self.w.gather.items() if any(x["id"] == material for x in v["drops"]))
+        return next((g for g, v in self.w.gather.items() if any(x["id"] == material for x in v["drops"])), None)
+
+    def enemy_for(self, material):
+        """The beatable enemy that drops this material fastest (Rowan's Fox Fur, 2026-10-21)."""
+        best = None
+        for e, v in self.w.enemies.items():
+            for x in v["materials"]:
+                if x["id"] == material and self.beatable(e):
+                    r = (self.rates(e) or {}).get(material, 0)
+                    if best is None or r > best[0]:
+                        best = (r, e)
+        return best[1] if best else None
+
+    def farm_material(self, material):
+        """One round of getting a material: break its node, or fight the enemy that drops it."""
+        if self.node_for(material):
+            if self.ensure_tool(material):
+                self.do(self.node_for(material))
+            return
+        e = self.enemy_for(material)
+        if e:
+            self.do(e)
+        else:
+            act = self.choose()
+            if act:
+                self.do(act)
 
     def ensure_tool(self, material):
         kind = self.w.gather[self.node_for(material)]["tool"]
         if any(self.w.tools[t]["kind"] == kind for t in self.tools):
             return True
         tool = min((t for t, v in self.w.tools.items() if v["kind"] == kind), key=lambda t: self.w.tools[t]["price"])
-        if self.coins >= self.w.tools[tool]["price"]:
+        if self.tool_ready(tool):
             self.go_shop()
             return True
-        # not enough for the tool yet: farm the cheapest coins
-        self.do(min((e for e in self.w.enemies if not self.w.enemies[e]["boss"]), key=lambda e: self.w.enemies[e]["hp"]), 2)
+        # not ready for the tool yet: farm what it still needs (its materials, then coins)
+        short = [x["id"] for x in self.w.toolRecipe[tool] if self.mats.get(x["id"], 0) < x["count"]]
+        e = self.enemy_for(short[0]) if short else None
+        self.do(e or min((e for e in self.w.enemies if not self.w.enemies[e]["boss"]), key=lambda e: self.w.enemies[e]["hp"]), 2)
         return False
 
     def ready_for_gate(self):
@@ -732,7 +856,7 @@ class Run:
 
 # ---------------------------------------------------------------------------
 def apply_overrides(data, sets):
-    """--set boss.PumpkinMace=0.05, gate.coins=2000, enemy.Chicken.coins=6-12,
+    """--set boss.PumpkinMace=0.05, gate.coins=2000, gate.CrystalShard=20, enemy.Chicken.coins=6-12,
     respawn.boss=30, weapon.Scythe.price=1500, armor.HarvestKnight.coins=600"""
     cfg = data["config"]
     for s in sets:
@@ -758,7 +882,15 @@ def apply_overrides(data, sets):
             else:
                 e[parts[2]] = num(val)
         elif parts[0] == "gate":
-            data["gate"][parts[1]] = num(val)
+            g = data["gate"]
+            if parts[1] in ("level", "coins"):
+                g[parts[1]] = num(val)
+            else:
+                # gate.CrystalShard=20: a material's count (0 drops it)
+                mats = [x for x in listify(g.get("materials")) if x["id"] != parts[1]]
+                if int(val) > 0:
+                    mats.append({"id": parts[1], "count": int(val)})
+                g["materials"] = mats
         elif parts[0] == "respawn":
             cfg.setdefault("respawn", {})[parts[1]] = num(val)
         elif parts[0] == "weapon":
@@ -772,7 +904,7 @@ def apply_overrides(data, sets):
                     if x["id"] == parts[2]:
                         x["count"] = num(val)
         elif parts[0] == "level":
-            data["leveling"][{"first": "first", "step": "step", "hp": "healthPerLevel"}[parts[1]]] = num(val)
+            data["leveling"][{"first": "first", "step": "step", "hp": "healthPerLevel", "growth": "growth", "basehp": "baseHealth"}[parts[1]]] = float(val)
         elif parts[0] == "quest":
             data["quest"]["steps"][parts[1]][parts[2]] = num(val)
         elif parts[0] == "player":
@@ -782,6 +914,8 @@ def apply_overrides(data, sets):
 
 
 def curve_total(lv, level):
+    if lv.get("growth"):
+        return sum(math.floor(lv["first"] * lv["growth"] ** (l - lv["start"]) + 0.5) for l in range(lv["start"], level))
     return sum(lv["first"] + lv["step"] * (l - lv["start"]) for l in range(lv["start"], level))
 
 
@@ -821,6 +955,7 @@ def main():
     ap.add_argument("--world", type=int, default=1)
     ap.add_argument("--runs", type=int, default=2000)
     ap.add_argument("--seed", type=int, default=1)
+    ap.add_argument("--probe", help="write the levels kills, quest hand-ins and worn armour happen at to this JSON file")
     ap.add_argument("--rod", action="store_true", help="count the fishing rod as a tool to buy")
     ap.add_argument("--goal", choices=("gate", "all"), default="gate", help="gate: stop at the gate; all: finish the world first")
     ap.add_argument("--from", dest="prev", type=int, default=None, help="arrive from this world: load its weapons and armour for the carried gear")
@@ -830,7 +965,7 @@ def main():
     ap.add_argument("--start-armor", default="FarmhandsGear,HarvestKnight")
     ap.add_argument("--start-wear", default="HarvestKnight")
     ap.add_argument("--set", action="append", default=[])
-    ap.add_argument("--upgrades", type=int, default=0, help="Health, Defense, Attack and Attack Speed upgrades at this level")
+    ap.add_argument("--upgrades", type=int, default=0, help="every upgrade at this level (the maxed arrival: 3 in World 2, 6 in World 3)")
     ap.add_argument("--trace", action="store_true")
     ap.add_argument("--remap", action="store_true", help="after level.* changes, move level requirements to the same EXP")
     a = ap.parse_args()
@@ -862,6 +997,16 @@ def main():
         print("total %.1f min, deaths %d, level %d" % (r.t / 60, r.deaths, r.level()))
         return
     runs = [Run(world, rng).play() for _ in range(a.runs)]
+    if a.probe:
+        merged = {"kill": {}, "step": {}, "wear": {}}
+        for r in runs:
+            for kind, groups in r.probe.items():
+                for key, hist in groups.items():
+                    out = merged[kind].setdefault(key, {})
+                    for lv, n in hist.items():
+                        out[lv] = out.get(lv, 0) + n
+        with open(a.probe, "w") as f:
+            json.dump(merged, f)
     times = [r.t / 60 for r in runs]
     if a.goal == "gate":
         print("World %d: %d runs (goal: buy the gate: level %d, %d coins, %s)" % (a.world, a.runs, world.gate["level"], world.gate["coins"],

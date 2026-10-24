@@ -24,6 +24,7 @@ local Config = Shared:WaitForChild("Config")
 local Balance = require(Config:WaitForChild("Balance"))
 local Enemies = require(Config:WaitForChild("Enemies"))
 local Upgrades = require(Config:WaitForChild("Upgrades"))
+local Bonuses = require(Config:WaitForChild("Bonuses"))
 
 local CoinService = {}
 
@@ -94,9 +95,8 @@ local function onKill(enemy: any, killer: Player?)
 		return
 	end
 	local amount = random:NextInteger(range.min, math.max(range.min, range.max))
-	-- passes and boosts (CoinBoost) times the Coins upgrade (Config/Upgrades)
-	local boost = killer:GetAttribute("CoinBoost")
-	boost = (if type(boost) == "number" and boost > 0 then boost else 1) * Upgrades.value(killer, "Coins")
+	-- passes and boosts (CoinBoost) plus the Coins upgrade, added (Config/Bonuses)
+	local boost = Bonuses.coins(killer)
 	if boost ~= 1 then
 		amount = math.max(1, math.floor(amount * boost + 0.5))
 	end

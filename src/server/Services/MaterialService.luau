@@ -32,6 +32,7 @@ local Config = Shared:WaitForChild("Config")
 local Enemies = require(Config:WaitForChild("Enemies"))
 local Materials = require(Config:WaitForChild("Materials"))
 local Upgrades = require(Config:WaitForChild("Upgrades"))
+local Bonuses = require(Config:WaitForChild("Bonuses"))
 
 local MaterialService = {}
 
@@ -136,9 +137,8 @@ local function onKill(enemy: any, killer: Player?)
 		return
 	end
 	local profile = profileOf(killer)
-	local luck = killer:GetAttribute("LuckBoost")
-	-- passes and boosts times the Luck upgrade (Config/Upgrades); never cores
-	luck = (if type(luck) == "number" and luck > 0 then luck else 1) * Upgrades.value(killer, "Luck")
+	-- passes, boosts and the Luck upgrade, added (Config/Bonuses); never cores
+	local luck = Bonuses.luck(killer)
 	local items = {}
 	for _, drop in table_ do
 		local material = Materials.get(drop.id)

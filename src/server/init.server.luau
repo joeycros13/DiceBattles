@@ -56,6 +56,8 @@ local SERVICE_ORDER = {
 	"FishingService",
 	-- the healing fountain: walk-in zones that heal to full on a cooldown
 	"HealZoneService",
+	-- the player's own settings (volumes, toggles; Config/Settings), saved with everything else
+	"SettingsService",
 }
 
 print("[Server] bootstrap starting")

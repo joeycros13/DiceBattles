@@ -170,6 +170,39 @@ return {
 			LightEmission = 1,
 		},
 	},
+	-- A healing potion drunk (HurtController, 2026-10-22): green + signs float up and away
+	-- (art/tools/ui/hurt_fx.py -> art/ui/hud/heal_plus.png).
+	HealPlus = {
+		kind = "burst",
+		count = 9,
+		emitter = {
+			Texture = "rbxassetid://90672393638076",
+			Size = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 0.3),
+				NumberSequenceKeypoint.new(0.2, 0.75),
+				NumberSequenceKeypoint.new(1, 0.55),
+			}),
+			Transparency = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 0),
+				NumberSequenceKeypoint.new(0.6, 0),
+				NumberSequenceKeypoint.new(1, 1),
+			}),
+			Lifetime = NumberRange.new(0.8, 1.2),
+			Speed = NumberRange.new(3, 5.5),
+			SpreadAngle = Vector2.new(70, 180),
+			Acceleration = Vector3.new(0, 5, 0),
+			Drag = 2.5,
+			LightEmission = 0,
+		},
+	},
+	-- A player taking a hit (HurtController, 2026-10-22): a red glow on the whole body, as
+	-- long as WeaponHud/HitFlash's red screen flash takes to fade (its FadeSeconds, 0.45).
+	PlayerHurt = {
+		kind = "flash",
+		color = Color3.fromRGB(255, 40, 40),
+		fillTransparency = 0.3,
+		time = 0.45,
+	},
 	-- A ground slam / heavy impact.
 	Shockwave = {
 		kind = "shockwave",

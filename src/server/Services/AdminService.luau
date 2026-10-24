@@ -25,10 +25,11 @@
 --   quest   { line, step } put a questline on a step, on offer (one past the last finishes it)
 --   questSkip { line }   move a questline on one step (no rewards; quest items are handed over)
 --   potionsEnd {}        end every running potion
---   upgrade { id, level } set an upgrade's level (Config/Upgrades), remote only
+--   upgrade { id, level } set an upgrade's level (Config/Upgrades; the panel's Upgrades page)
+--   upgradeAll { level } set every upgrade to one level (Max all / Reset all)
 --   daily { streak, yesterday }  set the Daily Rewards streak; yesterday = the last claim was
 --                        yesterday (the next claim climbs), else it's forgotten (testing)
---   lbReset { period }   pay a Daily / Weekly period's leaderboard rewards now from this
+--   lbReset { period }   pay the Weekly boards' leaderboard rewards now from this
 --                        server's boards (testing; real resets need DataStores)
 -- material and armor have no panel buttons yet; call them through the remote (tool is on the
 -- panel's Tools page since 2026-10-19)
@@ -46,6 +47,7 @@ local Materials = require(Config:WaitForChild("Materials"))
 local Potions = require(Config:WaitForChild("Potions"))
 local Quests = require(Config:WaitForChild("Quests"))
 local Tools = require(Config:WaitForChild("Tools"))
+local Upgrades = require(Config:WaitForChild("Upgrades"))
 local Weapons = require(Config:WaitForChild("Weapons"))
 local Enemies = require(Config:WaitForChild("Enemies"))
 local Leveling = require(Config:WaitForChild("Leveling"))
@@ -264,11 +266,22 @@ local ACTIONS: { [string]: (Player, any) -> (boolean, string) } = {
 	end,
 	upgrade = function(player, request)
 		local level = tonumber(request.level)
-		if type(request.id) ~= "string" or not level then
+		local def = Upgrades.get(request.id)
+		if not (def and level) then
 			return false, Text.badNumber
 		end
-		deps.Services.UpgradeService.set(player, request.id, level)
-		return true, ("%s -> level %d"):format(request.id, level)
+		deps.Services.UpgradeService.set(player, def.id, level)
+		return true, Text.upgradeSet:format(def.name, Upgrades.level(player, def.id))
+	end,
+	upgradeAll = function(player, request)
+		local level = tonumber(request.level)
+		if not level then
+			return false, Text.badNumber
+		end
+		for _, def in Upgrades.list() do
+			deps.Services.UpgradeService.set(player, def.id, level)
+		end
+		return true, Text.upgradesAll:format(math.clamp(math.floor(level), 0, Upgrades.maxLevel()))
 	end,
 	-- daily { streak?, yesterday? }: set the Daily Rewards streak (testing); yesterday = true makes
 	-- the last claim yesterday (so the next one climbs), else the claim is forgotten (claim today)
@@ -279,8 +292,8 @@ local ACTIONS: { [string]: (Player, any) -> (boolean, string) } = {
 		return true, ("Daily streak %d%s"):format(streak, if request.yesterday then ", last claim yesterday" else "")
 	end,
 	lbReset = function(_player, request)
-		if request.period ~= "Daily" and request.period ~= "Weekly" then
-			return false, "Daily or Weekly"
+		if request.period ~= "Weekly" then
+			return false, "Weekly only (the daily boards are gone)"
 		end
 		local paid = deps.Services.LeaderboardService.payLocal(request.period)
 		return true, ("Paid %d %s rewards"):format(paid, request.period)

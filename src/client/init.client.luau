@@ -11,6 +11,8 @@ local Remotes = require(Shared:WaitForChild("Remotes"))
 local UTIL_ORDER = {
 	-- first: sizes every pixel-only UI value (outlines, text caps...) for this screen
 	"Responsive",
+	-- the UI and reward sounds (Assets/Sounds/UI): clicks, panels, coins landing, level up
+	"UiSound",
 	-- the hover and click effect on every clickable button (an "FxScale" UIScale on it)
 	"ButtonFx",
 	"DamagePopup",
@@ -21,6 +23,8 @@ local UTIL_ORDER = {
 	"Format",
 	-- the shared weapon tile every screen clones
 	"WeaponTile",
+	-- every stat's shown total, for any player (the Stats panel and the profile cards)
+	"StatSheet",
 	-- sizes the text in icon + text rows so they stay centred
 	"CenterRow",
 }
@@ -49,6 +53,8 @@ local CONTROLLER_ORDER = {
 	"TelescopeController",
 	-- local sky/lighting for special places (the stump room's twilight)
 	"AmbienceController",
+	-- each world's background sounds (birds, wind, music) only while you're in it
+	"WorldAudioController",
 	-- the Infuser altars: the Infuse prompt and the infusion reveal
 	"InfuserController",
 	-- World 3's secret: the three breathing crystals and their colour code
@@ -59,6 +65,14 @@ local CONTROLLER_ORDER = {
 	"FishingController",
 	-- the healing fountain's sparkles and "+HP" popup (HealZoneService heals)
 	"HealZoneController",
+	-- applies the player's settings (volumes, guide arrow, particles, shadows; Config/Settings)
+	"SettingsController",
+	-- a hit's red glow, recoil and stumble; the low-health edge glow; a healing potion's + signs
+	"HurtController",
+	-- the weekly leaderboard winners' medal over the head and #1 trail
+	"LeaderFlairController",
+	-- every other player's name over their head in the game's font (Roblox's own is hidden)
+	"NameTagController",
 }
 
 local UI_ORDER = {
@@ -74,8 +88,14 @@ local UI_ORDER = {
 	"DailyRewardsUI",
 	-- the HUD's Stats panel: every multiplier and where it comes from
 	"StatsUI",
+	-- the player card (yours from the HUD avatar, anyone's from the player list) and
+	-- the press-E peek on other players
+	"ProfileUI",
+	"InspectUI",
 	-- the HUD's Leaderboards panel (LeaderboardService)
 	"LeaderboardUI",
+	-- the HUD's Settings panel (Config/Settings; SettingsController applies them)
+	"SettingsUI",
 	"RobuxShopUI",
 	"IndexUI",
 	"IndexPopup",

@@ -91,18 +91,17 @@ local function send(player: Player, id: string, def: Gathering.NodeDef, state: N
 	end
 end
 
--- Roll a node's drops: each entry on its own. The Gathering upgrade (Config/Upgrades)
--- multiplies the amount; the leftover fraction is a chance of one more (2 x 1.3 = 2.6:
--- 3 most of the time, 2 sometimes).
+-- Roll a node's drops: each entry on its own. The Gathering upgrade (Config/Upgrades) is a
+-- chance that an entry's amount comes doubled (2026-10-22, 1% a level; it was a straight
+-- +10% materials a level).
 local function rollDrops(def: Gathering.NodeDef, player: Player): { { id: string, amount: number } }
-	local yield = Upgrades.value(player, "Gathering")
+	local double = Upgrades.value(player, "Gathering")
 	local items = {}
 	for _, drop in def.drops do
 		if random:NextNumber() < drop.chance then
 			local amount = random:NextInteger(drop.min, math.max(drop.min, drop.max))
-			if amount > 0 and yield ~= 1 then
-				local scaled = amount * yield
-				amount = math.floor(scaled) + (if random:NextNumber() < scaled % 1 then 1 else 0)
+			if amount > 0 and double > 0 and random:NextNumber() < double then
+				amount *= 2
 			end
 			if amount > 0 then
 				table.insert(items, { id = drop.id, amount = amount })

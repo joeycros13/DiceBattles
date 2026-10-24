@@ -1,21 +1,31 @@
 --!strict
 -- StatsUI: the Stats panel (2026-10-19, option A "stat sheet" on
 -- https://claude.ai/artifact/E7RQQXPYH2ZCKBB6V4YaWk), opened from the HUD's
--- WeaponHud/SideButtons/StatsButton. Every stat shows as its total MULTIPLIER, never a
--- percentage (the user's rule), with a chip for each thing that feeds it:
+-- WeaponHud/SideButtons/StatsButton. Every stat shows as its total MULTIPLIER (the user's
+-- rule), except chances and regen, which are percentages since 2026-10-22 (the user: Crit
+-- Chance, Regen, Gathering), with a chip for each thing that feeds it:
 --   Max Health    the number: (level's HP + armour) x the Health upgrade (flat bonuses
 --                 first, then multipliers)
---   Luck / Coins / EXP   the shop's passes and boosts (LuckBoost / CoinBoost / ExpBoost,
---                 ShopService) x the upgrade
---   Damage        the Strength potion x the Attack upgrade
+--   Luck / Coins / EXP   1 + the shop's passes and boosts' share (LuckBoost / CoinBoost /
+--                 ExpBoost, ShopService) + the upgrade's share
+--   Damage        1 + the Strength potion's share + the Attack upgrade's
+-- Bonuses ADD (2026-10-23, the user: x1.5 and x2 make x2.5): the totals come from
+-- Config/Bonuses, the same numbers the server uses, and each chip shows its share as a
+-- multiplier ("Passes & boosts +1.5×" on a ×2.50 total).
 --   Defense       how much tougher: 1 / (armour's damage x Stoneskin x the Defense upgrade)
---   Attack Speed, Gathering   the upgrade (Upgrades.multiplier)
---   Regen         against the base 1% a second: the upgrade's share plus a Regen potion's
---                 (Gathering is yield, so a Gatherer's potion, which hits harder, isn't on it)
---   Sprint        the Sprint upgrade x a Swiftness potion ("Locked" before Sprint 1)
+--   Attack Speed  the upgrade (Upgrades.multiplier)
+--   Gathering     the chance a tree's or rock's drop comes doubled (the upgrade; a Gatherer's
+--                 potion makes tools hit harder, so it isn't on it)
+--   Regen         the share of max HP healed a second: Roblox's base 1% plus the upgrade's
+--                 share plus a Regen potion's
+--   Sprint        1 + the Sprint upgrade's share + a Swiftness potion's + the armour's
+--                 ("Locked" before Sprint 1)
+--   Crit Damage   a critical hit's whole multiplier (x1.50 at the start, the upgrade adds 0.05)
+--   Crit Chance   the chance a hit is critical: the base 10% plus the upgrade
 -- An admin's own test settings show as an "Admin" chip, only while one is set: the
 -- damage multiplier (DamageMultiplier) and the max-health override (MaxHealthOverride,
 -- which replaces the whole max), so the panel matches what they really have.
+-- The numbers come from Util/StatSheet (shared with the profile cards).
 -- Hand-built StarterGui/StatsPanel (Panel = "Stats"): Window/World/Label, Window/Sheet
 -- (a UIGridLayout) filled with Templates/StatRow clones (Tile/Icon, StatName, Parts,
 -- Total; UpColor / SameColor attributes), each Parts holding Templates/PartChip clones
@@ -26,11 +36,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config")
 local Upgrades = require(Config:WaitForChild("Upgrades"))
-local Potions = require(Config:WaitForChild("Potions"))
-local Leveling = require(Config:WaitForChild("Leveling"))
 
 local Util = script.Parent.Parent:WaitForChild("Util")
 local Format = require(Util:WaitForChild("Format"))
+local StatSheet = require(Util:WaitForChild("StatSheet"))
 
 local StatsUI = {}
 
@@ -39,26 +48,8 @@ local GUI_TIMEOUT = 15
 local TICK = 0.5
 local player = Players.LocalPlayer
 
--- Every word the panel shows.
-local Text = {
-	pill = "Level %s · all your multipliers",
-	locked = "Locked",
-	noBonus = "No bonus yet",
-	level = "Level HP %s",
-	armour = "Armour +%s",
-	upgrade = "Upgrade %s",
-	shop = "Passes & boosts %s",
-	potion = "%s %s",
-	armourDefense = "Armour %s",
-	base = "Base 1% a second",
-	adminX = "Admin %s",
-	adminOverride = "Admin override",
-	names = {
-		Health = "Max Health", Luck = "Luck", Attack = "Damage", Coins = "Coins", Defense = "Defense",
-		Exp = "EXP", AttackSpeed = "Attack Speed", Regen = "Regen", Sprint = "Sprint", Gathering = "Gathering",
-	},
-}
-local ORDER = { "Health", "Luck", "Attack", "Coins", "Defense", "Exp", "AttackSpeed", "Regen", "Sprint", "Gathering" }
+local Text = StatSheet.Text
+local ORDER = StatSheet.ORDER
 
 local PanelWindow: any = nil
 local FontDrop: any = nil
@@ -71,114 +62,6 @@ local function number(name: string, fallback: number): number
 	return if type(value) == "number" then value else fallback
 end
 
-local times = Upgrades.times
-
-local function upgradeX(id: string): number
-	local def = Upgrades.get(id)
-	return if def then Upgrades.multiplier(def, Upgrades.level(player, id)) else 1
-end
-
--- A potion's name for a chip ("Strength II"), or nil while none runs.
-local function potionName(kind: string): string?
-	local tier = Potions.running(player, kind)
-	local def = tier and Potions.get(kind .. tier)
-	return def and def.name or nil
-end
-
--- One stat's total and its source chips.
-local function measure(id: string): (string, { string }, boolean)
-	local parts = {}
-	local up = Upgrades.level(player, id) > 0
-	if id == "Health" then
-		local character = player.Character
-		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-		local level = number("Level", 1)
-		table.insert(parts, Text.level:format(Format.commas(Leveling.maxHealth(level))))
-		local armour = number("ArmorHealth", 0)
-		if armour > 0 then
-			table.insert(parts, Text.armour:format(Format.commas(armour)))
-		end
-		if up then
-			table.insert(parts, Text.upgrade:format(times(upgradeX(id))))
-		end
-		local override = number("MaxHealthOverride", 0) > 0
-		if override then
-			table.insert(parts, Text.adminOverride)
-		end
-		local max = if humanoid then humanoid.MaxHealth else Leveling.maxHealth(level)
-		return Format.commas(math.floor(max + 0.5)), parts, armour > 0 or up or override
-	elseif id == "Luck" or id == "Coins" or id == "Exp" then
-		local shop = number(({ Luck = "LuckBoost", Coins = "CoinBoost", Exp = "ExpBoost" })[id], 1)
-		if shop ~= 1 then
-			table.insert(parts, Text.shop:format(times(shop)))
-		end
-		if up then
-			table.insert(parts, Text.upgrade:format(times(upgradeX(id))))
-		end
-		local total = shop * upgradeX(id)
-		return times(total), parts, total > 1.0001
-	elseif id == "Attack" then
-		local strength = Potions.multiplier(player, "Strength")
-		local name = potionName("Strength")
-		if name then
-			table.insert(parts, Text.potion:format(name, times(strength)))
-		end
-		if up then
-			table.insert(parts, Text.upgrade:format(times(upgradeX(id))))
-		end
-		local admin = number("DamageMultiplier", 1)
-		if admin ~= 1 then
-			table.insert(parts, Text.adminX:format(times(admin)))
-		end
-		local total = strength * upgradeX(id) * admin
-		return times(total), parts, total > 1.0001
-	elseif id == "Defense" then
-		local armour = 1 - math.clamp(number("ArmorDefense", 0), 0, 0.9)
-		local skin = Potions.multiplier(player, "Stoneskin")
-		if armour < 1 then
-			table.insert(parts, Text.armourDefense:format(times(1 / armour)))
-		end
-		local name = potionName("Stoneskin")
-		if name then
-			table.insert(parts, Text.potion:format(name, times(1 / skin)))
-		end
-		if up then
-			table.insert(parts, Text.upgrade:format(times(upgradeX(id))))
-		end
-		local total = 1 / (armour * skin * Upgrades.value(player, "Defense"))
-		return times(total), parts, total > 1.0001
-	elseif id == "Sprint" then
-		if not up then
-			return Text.locked, { Text.noBonus }, false
-		end
-		table.insert(parts, Text.upgrade:format(times(upgradeX(id))))
-		local swift = Potions.multiplier(player, "Swiftness")
-		local name = potionName("Swiftness")
-		if name then
-			table.insert(parts, Text.potion:format(name, times(swift)))
-		end
-		return times(upgradeX(id) * swift), parts, true
-	elseif id == "Regen" then
-		table.insert(parts, Text.base)
-		if up then
-			table.insert(parts, Text.upgrade:format(times(upgradeX(id))))
-		end
-		-- a Regen potion adds its own share of the base 1% a second
-		local regen = Potions.multiplier(player, "Regen")
-		local name = potionName("Regen")
-		if name then
-			table.insert(parts, Text.potion:format(name, times(regen)))
-		end
-		local total = upgradeX(id) + regen - 1
-		return times(total), parts, total > 1.0001
-	end
-	-- Attack Speed, Gathering: the upgrade alone
-	if up then
-		table.insert(parts, Text.upgrade:format(times(upgradeX(id))))
-	end
-	return times(upgradeX(id)), parts, up
-end
-
 local function build()
 	local sheet = window.Sheet
 	for index, id in ORDER do
@@ -188,7 +71,7 @@ local function build()
 		row.Visible = true
 		local def = Upgrades.get(id)
 		row.Tile.Icon.Image = if def then def.icon else ""
-		row.StatName.Text = Text.names[id] or id
+		row.StatName.Text = StatSheet.name(id)
 		row.Parent = sheet
 		rows[id] = row
 	end
@@ -224,7 +107,7 @@ function StatsUI.refresh()
 		window.World.Label.Text = Text.pill:format(Format.commas(number("Level", 1)))
 	end
 	for id, row in rows do
-		local total, parts, raised = measure(id)
+		local total, parts, raised = StatSheet.measure(player, id)
 		row.Total.Text = total
 		row.Total.TextColor3 = row:GetAttribute(if raised then "UpColor" else "SameColor") or row.Total.TextColor3
 		fillChips(row, parts)

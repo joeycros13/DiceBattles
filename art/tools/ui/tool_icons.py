@@ -1,4 +1,4 @@
-"""Gathering tool icons (World 1 2026-10-19, World 2's Stone Axe / Stone Rod 2026-10-20): the finishing pass of weapon_icons_w2.py for the
+"""Gathering tool icons (World 1 2026-10-19, World 2's Stone Axe / Stone Rod 2026-10-20, World 3's Crystal Pickaxe / Crystal Rod 2026-10-24): the finishing pass of weapon_icons_w2.py for the
 cel-shaded raw renders of the Wooden Axe, Pickaxe and Rod (Blender text block "w1_icons_rerender",
 render(id), raw PNGs in art/icons/tools/raw). Crops to a square, adds the chunky ink outline and a
 soft shadow down and to the right, saves 512 px icons to art/icons/tools, and builds a review sheet
@@ -13,9 +13,10 @@ ART = os.path.dirname(os.path.dirname(HERE))
 RAW = os.path.join(ART, "icons", "tools", "raw")
 TILES = os.path.join(ART, "ui", "inventory")
 OUT = os.path.join(ART, "icons", "tools")
-WEAPONS = ["WoodenAxe", "WoodenPickaxe", "WoodenRod", "StoneAxe", "StoneRod"]
+WEAPONS = ["WoodenAxe", "WoodenPickaxe", "WoodenRod", "StoneAxe", "StoneRod", "CrystalPickaxe", "CrystalRod"]
 RARITY = {"WoodenAxe": "common", "WoodenPickaxe": "common", "WoodenRod": "common",
-          "StoneAxe": "uncommon", "StoneRod": "uncommon"}
+          "StoneAxe": "uncommon", "StoneRod": "uncommon",
+          "CrystalPickaxe": "rare", "CrystalRod": "rare"}
 INK = (22, 18, 28)
 WORK, FINAL, OUTLINE, SHADOW, MARGIN = 1024, 512, 22, (14, 20), 0.06
 

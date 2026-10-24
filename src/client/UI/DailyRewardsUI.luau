@@ -21,6 +21,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
+local UiSound = require(script.Parent.Parent:WaitForChild("Util"):WaitForChild("UiSound"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = Shared:WaitForChild("Config")
@@ -167,6 +168,7 @@ local function claim()
 		return Remotes.getFunction("ClaimDaily"):InvokeServer()
 	end)
 	busy = false
+	UiSound.play(if ok and granted == true then "QuestComplete" else "Refuse")
 	if ok and granted == true and type(result) == "string" then
 		say(true, Text.claimedMessage:format(result))
 	elseif ok and result == "away" then
@@ -185,6 +187,7 @@ local function redeem()
 		return Remotes.getFunction("RedeemCode"):InvokeServer(box.Text)
 	end)
 	busy = false
+	UiSound.play(if ok and granted == true then "QuestComplete" else "Refuse")
 	if ok then
 		say(granted == true, if type(message) == "string" then message else "")
 		if granted then

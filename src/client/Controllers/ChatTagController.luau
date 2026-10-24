@@ -1,6 +1,6 @@
 --!strict
 -- ChatTagController: the gold [VIP] tag (and a leaderboard reward's blue tag, e.g.
--- [#1 Daily Kills], 2026-10-19) in front of a player's chat
+-- [#1 Weekly Kills], 2026-10-19) in front of a player's chat
 -- messages (the VIP gamepass, ShopService publishes the player's "VIP"
 -- attribute), and the Index title the player wears (2026-10-20: IndexService's "Title"
 -- attribute; a Collector title in aqua, a Completionist title in gold), first.

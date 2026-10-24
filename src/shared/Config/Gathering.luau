@@ -25,6 +25,9 @@
 -- A node's model may hold a child named `Remains` (a stump, rubble): it shows only
 -- while the node is broken, and the rest only while it stands.
 
+-- World scale (2026-10-23, Config/Leveling): node health x2 / x8 for Worlds 1 / 2, like the tools'
+-- power (Config/Tools).
+
 local Gathering = {}
 
 export type Drop = { id: string, min: number, max: number, chance: number }
@@ -58,7 +61,7 @@ Gathering.Nodes = {
 		verb = "Chop",
 		tool = "Axe",
 		tier = 1,
-		hp = 50,
+		hp = 100,
 		respawn = 45,
 		drops = {
 			{ id = "OakLog", min = 2, max = 3, chance = 1 },
@@ -71,7 +74,7 @@ Gathering.Nodes = {
 		verb = "Mine",
 		tool = "Pickaxe",
 		tier = 1,
-		hp = 60,
+		hp = 120,
 		respawn = 45,
 		drops = {
 			{ id = "Stone", min = 2, max = 3, chance = 1 },
@@ -87,11 +90,44 @@ Gathering.Nodes = {
 		verb = "Chop",
 		tool = "Axe",
 		tier = 2,
-		hp = 100,
+		hp = 1000,
 		respawn = 45,
 		drops = {
 			{ id = "RedwoodLog", min = 2, max = 3, chance = 1 },
 			{ id = "AmberSap", min = 1, max = 1, chance = 0.1 },
+		},
+	},
+	-- ==================== World 3 (The Crystal Caverns) ====================
+	-- (2026-10-24, the user's design) Mining only: both need the Crystal Pickaxe (power 2,000),
+	-- an Ore Rock in 6 hits like World 1's boulder and a cluster in 5. Models: Blender
+	-- w3_gather_build, art/meshes/w3_gathering.fbx (a grey rock with orange ore veins and nuggets;
+	-- a rounded rock with cyan, pink and purple crystals and a pink gem), unlike the cave's
+	-- decoration ores and crystals. The Raw Gem is the cluster's rare drop (placeholder 10%).
+	OreRock = {
+		id = "OreRock",
+		name = "Ore Rock",
+		world = 3,
+		verb = "Mine",
+		tool = "Pickaxe",
+		tier = 3,
+		hp = 12000,
+		respawn = 45,
+		drops = {
+			{ id = "IronOre", min = 2, max = 3, chance = 1 },
+		},
+	},
+	CrystalCluster = {
+		id = "CrystalCluster",
+		name = "Crystal Cluster",
+		world = 3,
+		verb = "Mine",
+		tool = "Pickaxe",
+		tier = 3,
+		hp = 10000,
+		respawn = 45,
+		drops = {
+			{ id = "CrystalShard", min = 2, max = 3, chance = 1 },
+			{ id = "RawGem", min = 1, max = 1, chance = 0.1 },
 		},
 	},
 } :: { [string]: NodeDef }
